@@ -141,7 +141,9 @@
                     SYSTEM_INFORMATION_CLASS.SystemBranchTargetInjection,
                     systemInformationPtr, systemInformationLength, returnLengthPtr);
 
-                if (retval != 0) {
+                // ((retval == 0xC0000002) || (retval == 0xC0000003))
+                // Windows hotfix not installed
+                if ((retval != 0) && (retval != 0xC0000002) && (retval != 0xC0000003)) {
                     Console.ForegroundColor = ConsoleColor.Red;
                     var message = $"Unexpected value returned from NtQuerySystemInformation: {retval}";
                     Console.WriteLine(message);
@@ -149,52 +151,52 @@
                     Console.ResetColor();
                     return;
                 }
-                else {
+                else if (retval == 0) {
                     speculativeExecutionAssessment.SetBranchTargetInjectionProperties(systemInformationPtr);
+                }
 
-                    if (string.IsNullOrWhiteSpace(speculativeExecutionAssessment.ErrorMessage)) {
+                if (string.IsNullOrWhiteSpace(speculativeExecutionAssessment.ErrorMessage)) {
 
-                        #region Debug logging
-                        Debug.WriteLine($"BpbEnabled: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbEnabled)}");
-                        Debug.WriteLine($"BpbDisabledSystemPolicy: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledSystemPolicy)}");
-                        Debug.WriteLine($"BpbDisabledNoHardwareSupport: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledNoHardwareSupport)}");
-                        Debug.WriteLine($"HwReg1Enumerated: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwReg1Enumerated)}");
-                        Debug.WriteLine($"HwReg2Enumerated: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwReg2Enumerated)}");
-                        Debug.WriteLine($"HwMode1Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode1Present)}");
-                        Debug.WriteLine($"HwMode2Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
-                        Debug.WriteLine($"SmepPresent: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
-                        #endregion
+                    #region Debug logging
+                    Debug.WriteLine($"BpbEnabled: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbEnabled)}");
+                    Debug.WriteLine($"BpbDisabledSystemPolicy: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledSystemPolicy)}");
+                    Debug.WriteLine($"BpbDisabledNoHardwareSupport: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledNoHardwareSupport)}");
+                    Debug.WriteLine($"HwReg1Enumerated: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwReg1Enumerated)}");
+                    Debug.WriteLine($"HwReg2Enumerated: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwReg2Enumerated)}");
+                    Debug.WriteLine($"HwMode1Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode1Present)}");
+                    Debug.WriteLine($"HwMode2Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
+                    Debug.WriteLine($"SmepPresent: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
+                    #endregion
 
-                        Console.Write("Hardware support for branch target injection mitigation is present: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.BTIHardwarePresent ? ConsoleColor.Green : ConsoleColor.Red;
-                        Console.WriteLine(speculativeExecutionAssessment.BTIHardwarePresent.ToString().ToUpperInvariant());
+                    Console.Write("Hardware support for branch target injection mitigation is present: ");
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIHardwarePresent ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine(speculativeExecutionAssessment.BTIHardwarePresent.ToString().ToUpperInvariant());
+                    Console.ResetColor();
+
+                    Console.Write("Windows OS support for branch target injection mitigation is present: ");
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportPresent ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportPresent.ToString().ToUpperInvariant());
+                    Console.ResetColor();
+
+                    Console.Write("Windows OS support for branch target injection mitigation is enabled: ");
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportEnabled ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportEnabled.ToString().ToUpperInvariant());
+                    Console.ResetColor();
+
+                    #region If Windows support for branch target injection mitigation is present but not enabled, log the reason (absence of settings or lack of hardware support)
+                    if (speculativeExecutionAssessment.BTIWindowsSupportPresent && !speculativeExecutionAssessment.BTIWindowsSupportEnabled) {
+                        Console.Write($"Windows OS support for branch target injection mitigation is disabled by system policy: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledBySystemPolicy ? ConsoleColor.Red : ConsoleColor.Green;
+                        Console.WriteLine(speculativeExecutionAssessment.BTIDisabledBySystemPolicy.ToString().ToUpperInvariant());
                         Console.ResetColor();
 
-                        Console.Write("Windows OS support for branch target injection mitigation is present: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportPresent ? ConsoleColor.Green : ConsoleColor.Red;
-                        Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportPresent.ToString().ToUpperInvariant());
+                        Console.Write($"Windows OS support for branch target injection mitigation is disabled by absence of hardware support: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport ? ConsoleColor.Red : ConsoleColor.Green;
+                        Console.WriteLine(speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport.ToString().ToUpperInvariant());
                         Console.ResetColor();
-
-                        Console.Write("Windows OS support for branch target injection mitigation is enabled: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportEnabled ? ConsoleColor.Green : ConsoleColor.Red;
-                        Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportEnabled.ToString().ToUpperInvariant());
-                        Console.ResetColor();
-
-                        #region If Windows support for branch target injection mitigation is present but not enabled, log the reason (absence of settings or lack of hardware support)
-                        if (speculativeExecutionAssessment.BTIWindowsSupportPresent && !speculativeExecutionAssessment.BTIWindowsSupportEnabled) {
-                            Console.Write($"Windows OS support for branch target injection mitigation is disabled by system policy: ");
-                            Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledBySystemPolicy ? ConsoleColor.Red : ConsoleColor.Green;
-                            Console.WriteLine(speculativeExecutionAssessment.BTIDisabledBySystemPolicy.ToString().ToUpperInvariant());
-                            Console.ResetColor();
-
-                            Console.Write($"Windows OS support for branch target injection mitigation is disabled by absence of hardware support: ");
-                            Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport ? ConsoleColor.Red : ConsoleColor.Green;
-                            Console.WriteLine(speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport.ToString().ToUpperInvariant());
-                            Console.ResetColor();
-                        }
-                        #endregion
-
                     }
+                    #endregion
+
                 }
             }
             finally {
@@ -233,7 +235,9 @@
 
                 long retval = NtQuerySystemInformation(SYSTEM_INFORMATION_CLASS.SystemKernelVAShadow, systemInformationPtr, systemInformationLength, returnLengthPtr);
 
-                if (retval != 0) {
+                // ((retval == 0xC0000002) || (retval == 0xC0000003))
+                // Windows hotfix not installed
+                if ((retval != 0) && (retval != 0xC0000002) && (retval != 0xC0000003)) {
                     Console.ForegroundColor = ConsoleColor.Red;
                     var message = $"Unexpected value returned from NtQuerySystemInformation: {retval}";
                     Console.WriteLine(message);
@@ -241,34 +245,34 @@
                     Console.ResetColor();
                     return;
                 }
-                else {
+                else if (retval == 0) {
                     speculativeExecutionAssessment.SetKernelVAShadowProperties(systemInformationPtr);
+                }
 
-                    if (string.IsNullOrWhiteSpace(speculativeExecutionAssessment.ErrorMessage)) {
-                        Debug.WriteLine($"KVAShadowWindowsSupportEnabled: {speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled}");
-                        Debug.WriteLine($"KvaShadowUserGlobal: {speculativeExecutionAssessment.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowUserGlobalFlag)}");
-                        Debug.WriteLine($"KvaShadowPcid: {speculativeExecutionAssessment.KVAShadowPcidEnabled}");
-                        Debug.WriteLine($"KvaShadowInvpcid: {speculativeExecutionAssessment.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowInvpcidFlag)}");
+                if (string.IsNullOrWhiteSpace(speculativeExecutionAssessment.ErrorMessage)) {
+                    Debug.WriteLine($"KVAShadowWindowsSupportEnabled: {speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled}");
+                    Debug.WriteLine($"KvaShadowUserGlobal: {speculativeExecutionAssessment.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowUserGlobalFlag)}");
+                    Debug.WriteLine($"KvaShadowPcid: {speculativeExecutionAssessment.KVAShadowPcidEnabled}");
+                    Debug.WriteLine($"KvaShadowInvpcid: {speculativeExecutionAssessment.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowInvpcidFlag)}");
 
-                        Console.WriteLine($"Hardware requires kernel VA shadowing: {speculativeExecutionAssessment.KVAShadowRequired.ToString().ToUpperInvariant()}");
+                    Console.WriteLine($"Hardware requires kernel VA shadowing: {speculativeExecutionAssessment.KVAShadowRequired.ToString().ToUpperInvariant()}");
 
-                        if (speculativeExecutionAssessment.KVAShadowRequired) {
-                            Console.Write("Windows OS support for kernel VA shadow is present: ");
-                            Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportPresent ? ConsoleColor.Green : ConsoleColor.Red;
-                            Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportPresent.ToString().ToUpperInvariant());
+                    if (speculativeExecutionAssessment.KVAShadowRequired) {
+                        Console.Write("Windows OS support for kernel VA shadow is present: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportPresent ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportPresent.ToString().ToUpperInvariant());
+                        Console.ResetColor();
+
+                        Console.Write("Windows OS support for kernel VA shadow is enabled: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled.ToString().ToUpperInvariant());
+                        Console.ResetColor();
+
+                        if (speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled) {
+                            Console.Write("Windows OS support for PCID performance optimization is enabled [not required for security]: ");
+                            Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowPcidEnabled ? ConsoleColor.Green : ConsoleColor.White;
+                            Console.WriteLine(speculativeExecutionAssessment.KVAShadowPcidEnabled.ToString().ToUpperInvariant());
                             Console.ResetColor();
-
-                            Console.Write("Windows OS support for kernel VA shadow is enabled: ");
-                            Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled ? ConsoleColor.Green : ConsoleColor.Red;
-                            Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled.ToString().ToUpperInvariant());
-                            Console.ResetColor();
-
-                            if (speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled) {
-                                Console.Write("Windows OS support for PCID performance optimization is enabled [not required for security]: ");
-                                Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowPcidEnabled ? ConsoleColor.Green : ConsoleColor.White;
-                                Console.WriteLine(speculativeExecutionAssessment.KVAShadowPcidEnabled.ToString().ToUpperInvariant());
-                                Console.ResetColor();
-                            }
                         }
                     }
                 }
