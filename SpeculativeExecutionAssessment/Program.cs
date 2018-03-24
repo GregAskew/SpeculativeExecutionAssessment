@@ -33,6 +33,7 @@
     /// https://blogs.technet.microsoft.com/ralphkyttle/2018/01/05/verifying-spectre-meltdown-protections-remotely/
     /// https://support.microsoft.com/en-us/help/4072698/windows-server-guidance-to-protect-against-the-speculative-execution
     /// https://support.microsoft.com/en-gb/help/4073119/protect-against-speculative-execution-side-channel-vulnerabilities-in
+	/// https://blogs.technet.microsoft.com/srd/2018/03/23/kva-shadow-mitigating-meltdown-on-windows/
     /// https://community.hpe.com/t5/Servers-The-Right-Compute/Resources-to-help-mitigate-Speculative-Execution-vulnerability/ba-p/6992955
     /// https://support.microsoft.com/kn-in/help/4073225/guidance-for-sql-server
     /// https://kb.vmware.com/s/article/52245
