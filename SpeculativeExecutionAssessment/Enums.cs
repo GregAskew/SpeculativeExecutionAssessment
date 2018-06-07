@@ -4,24 +4,26 @@ namespace SpeculativeExecutionAssessment {
 
     [Flags]
     public enum BTIFlags : uint {
-        Undefined = 0x0,
-        SCFBpbEnabled = 0x1,
-        SCFBpbDisabledSystemPolicy = 0x2,
-        SCFBpbDisabledNoHardwareSupport = 0x4,
-        SCFHwReg1Enumerated = 0x8,
-        SCFHwReg2Enumerated = 0x10,
-        SCFHwMode1Present = 0x20,
-        SCFHwMode2Present = 0x40,
-        SCFSmepPresent = 0x80
+        Undefined = 0x00000000,
+        SCFBpbEnabled = 0x00000001,
+        SCFBpbDisabledSystemPolicy = 0x00000002,
+        SCFBpbDisabledNoHardwareSupport = 0x00000004,
+        SCFHwReg1Enumerated = 0x00000008,
+        SCFHwReg2Enumerated = 0x00000010,
+        SCFHwMode1Present = 0x00000020,
+        SCFHwMode2Present = 0x00000040,
+        SCFSmepPresent = 0x00000080
     }
 
     [Flags]
     public enum KernelVAFlags : uint {
-        Undefined = 0x0,
-        KVAShadowEnabledFlag = 0x01,
-        KVAShadowUserGlobalFlag = 0x02,
-        KVAShadowPcidFlag = 0x04,
-        KVAShadowInvpcidFlag = 0x08
+        Undefined = 0x00000000,
+        KVAShadowEnabledFlag = 0x00000001,
+        KVAShadowUserGlobalFlag = 0x00000002,
+        KVAShadowPcidFlag = 0x00000004,
+        KVAShadowInvpcidFlag = 0x00000008,
+        KVAShadowRequiredFlag = 0x00000010,
+        KVAShadowRequiredAvailableFlag = 0x00000020
     }
 
     internal enum SYSTEM_INFORMATION_CLASS : uint {

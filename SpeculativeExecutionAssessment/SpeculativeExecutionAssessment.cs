@@ -5,6 +5,7 @@
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.Linq;
+    using System.Management;
     using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading.Tasks;
@@ -160,6 +161,92 @@
 
         #region Methods
 
+        private void GetProcessorWmiInformation() {
+
+            var processorManufacturer = string.Empty;
+            var processorDescription = string.Empty;
+
+            try {
+                var scope = new ManagementScope($@"\root\CIMV2");
+                var query = new ObjectQuery("SELECT Manufacturer,Description FROM Win32_Processor");
+                using (var searcher = new ManagementObjectSearcher(scope, query)) {
+                    searcher.Options.Timeout = TimeSpan.FromMinutes(5);
+                    foreach (ManagementObject managementObject in searcher.Get()) {
+                        foreach (PropertyData prop in managementObject.Properties) {
+
+                            if (prop.Name == "Manufacturer") processorManufacturer = prop.Value.ToString();
+                            if (prop.Name == "Description") processorDescription = prop.Value.ToString();
+                        } // foreach (PropertyData prop in managementObject.Properties) {
+                        break;
+                    } // foreach (ManagementObject managementObject in searcher.Get()) {
+                } // using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
+
+                Console.WriteLine($"Processor: Manufacturer: {(!string.IsNullOrWhiteSpace(processorManufacturer) ? processorManufacturer : "N/A")} Description: {(!string.IsNullOrWhiteSpace(processorDescription) ? processorDescription : "N/A")}");
+
+                if (string.IsNullOrWhiteSpace(processorManufacturer)) {
+                    this.ErrorMessage = "Unable to get Processor Manufacturer from WMI";
+                }
+                if (string.Equals(processorManufacturer, "AuthenticAMD", StringComparison.OrdinalIgnoreCase)) {
+                    this.KVAShadowRequired = false;
+                    return;
+                }
+                if (!string.Equals(processorManufacturer, "GenuineIntel", StringComparison.OrdinalIgnoreCase)) {
+                    this.ErrorMessage = $"Unsupported processor manufacturer: {processorManufacturer}";
+                }
+
+                if (string.IsNullOrWhiteSpace(processorDescription)) {
+                    this.ErrorMessage = "Unable to get Processor Description from WMI";
+                    return;
+                }
+
+                if (processorDescription.IndexOf("Family") == -1) {
+                    this.ErrorMessage = "Processor Description from WMI does not contain Family";
+                    return;
+                }
+
+                if (processorDescription.IndexOf("Model") == -1) {
+                    this.ErrorMessage = "Processor Description from WMI does not contain Model";
+                    return;
+                }
+
+                // Example processor description:
+                // Intel64 Family 6 Model 58 Stepping 9
+
+                processorDescription = processorDescription.Substring(processorDescription.IndexOf("Family"));
+                if (processorDescription.IndexOf("Stepping", StringComparison.OrdinalIgnoreCase) > -1) {
+                    processorDescription = processorDescription.Substring(0, processorDescription.IndexOf("Stepping", StringComparison.OrdinalIgnoreCase));
+                }
+                processorDescription = processorDescription.Trim();
+                // Family 6 Model 58
+
+                var processorDescriptionElements = processorDescription.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (processorDescriptionElements.Length == 4) {
+                    if (!int.TryParse(processorDescriptionElements[1], out int processorFamily)) {
+                        this.ErrorMessage = $"Unable to parse numeric Processor Family from WMI Description: {processorDescription}";
+                        return;
+                    }
+                    if (!int.TryParse(processorDescriptionElements[3], out int processorModel)) {
+                        this.ErrorMessage = $"Unable to parse numeric Processor Model from WMI Description: {processorDescription}";
+                        return;
+                    }
+
+                    if (processorFamily == 0x6) {
+                        if ((processorModel == 0x1C) || (processorModel == 0x26) || (processorModel == 0x27)
+                            || (processorModel == 0x36) || (processorModel == 0x35)) {
+                            this.KVAShadowRequired = false;
+                        }
+                    }
+                }
+                else {
+                    this.ErrorMessage = $"Unable to parse expected number (four) elements from from WMI Processor Description: {processorDescription}";
+                }
+            }
+            catch (Exception e) {
+                this.ErrorMessage = $"Exception: {e.Message} TargetSite: {e.TargetSite.Name}";
+            }
+
+        }
+
         private bool IsEnumValid<TEnum>(TEnum enumToTest) {
             bool isvalid = false;
 
@@ -229,6 +316,19 @@
             this.KVAShadowPcidEnabled =
                 this.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowPcidFlag)
                 || this.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowInvpcidFlag);
+
+            if (this.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowRequiredAvailableFlag)) {
+                this.KVAShadowRequired = this.KernelVAFlags.HasFlag(KernelVAFlags.KVAShadowRequiredFlag);
+            }
+            else {
+                this.GetProcessorWmiInformation();
+                if (!string.IsNullOrWhiteSpace(this.ErrorMessage)) {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Exiting due to error getting processor WMI information: {this.ErrorMessage}");
+                    Console.ResetColor();
+                    return;
+                }
+            }
         }
 
         #endregion

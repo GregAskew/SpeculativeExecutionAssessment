@@ -21,13 +21,14 @@
     /// </summary>
     /// <remarks>
     /// WARNING: Ensure that "Prefer 32-bit" is not checked in the build options.
-    /// Requires elevated permissions
-    /// Mitigiation requires:
-    ///  1. Set the registry value indicating the antivirus/security product is compatible with the Windows update
-    ///  2. Install the Windows operating system update (part of the January 2018 Security Monthly Quality Rollup)
-    ///  3. Enable the registry settings
-    ///  4. Update the hardware/firmware
-    ///  5. On virtual platforms, the hypervisor must be updated (or for Hyper-V, it may be reconfigured)
+    /// Requires elevated permissions.
+    /// Mitigation requires:
+    ///  1. Set the registry value indicating the antivirus/security product is compatible with the Windows update.
+    ///  2. Install the Windows operating system update (part of the January 2018 Cumulative Update).
+    ///  3. Create the registry settings to enable the mitigation.
+    ///  4. Update the hardware/firmware.
+    ///  5. On virtual platforms, the hypervisor must be updated (or for Hyper-V, it may be reconfigured).
+    ///  6. Shutdown, power off, and power on the host and any virtual guests.
     /// https://gallery.technet.microsoft.com/scriptcenter/Speculation-Control-e36f0050
     /// https://support.microsoft.com/en-gb/help/4074629/understanding-the-output-of-get-speculationcontrolsettings-powershell
     /// https://blogs.technet.microsoft.com/ralphkyttle/2018/01/05/verifying-spectre-meltdown-protections-remotely/
@@ -36,10 +37,11 @@
 	/// https://blogs.technet.microsoft.com/srd/2018/03/23/kva-shadow-mitigating-meltdown-on-windows/
     /// https://community.hpe.com/t5/Servers-The-Right-Compute/Resources-to-help-mitigate-Speculative-Execution-vulnerability/ba-p/6992955
     /// https://support.microsoft.com/kn-in/help/4073225/guidance-for-sql-server
+    /// https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/cve-2017-5715-and-hyper-v-vms
     /// https://kb.vmware.com/s/article/52245
     /// https://github.com/ionescu007/SpecuCheck/blob/master/specucheck.c
     /// </remarks>
-    class Program {
+    internal class Program {
 
         [DllImport("ntdll.dll", SetLastError = true, EntryPoint = "NtQuerySystemInformation")]
         internal static extern long NtQuerySystemInformation(
@@ -223,15 +225,6 @@
                 Console.WriteLine();
                 Console.ResetColor();
 
-                GetProcessorWmiInformation(speculativeExecutionAssessment);
-
-                if (!string.IsNullOrWhiteSpace(speculativeExecutionAssessment.ErrorMessage)) {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Exiting due to error getting processor WMI information: {speculativeExecutionAssessment.ErrorMessage}");
-                    Console.ResetColor();
-                    return;
-                }
-
                 uint systemInformationLength = 4;
 
                 long retval = NtQuerySystemInformation(SYSTEM_INFORMATION_CLASS.SystemKernelVAShadow, systemInformationPtr, systemInformationLength, returnLengthPtr);
@@ -287,92 +280,6 @@
                     Marshal.FreeHGlobal(returnLengthPtr);
                 }
             }
-        }
-
-        private static void GetProcessorWmiInformation(SpeculativeExecutionAssessment speculativeExecutionAssessment) {
-
-            var processorManufacturer = string.Empty;
-            var processorDescription = string.Empty;
-
-            try {
-                var scope = new ManagementScope($@"\root\CIMV2");
-                var query = new ObjectQuery("SELECT Manufacturer,Description FROM Win32_Processor");
-                using (var searcher = new ManagementObjectSearcher(scope, query)) {
-                    searcher.Options.Timeout = TimeSpan.FromMinutes(5);
-                    foreach (ManagementObject managementObject in searcher.Get()) {
-                        foreach (PropertyData prop in managementObject.Properties) {
-
-                            if (prop.Name == "Manufacturer") processorManufacturer = prop.Value.ToString();
-                            if (prop.Name == "Description") processorDescription = prop.Value.ToString();
-                        } // foreach (PropertyData prop in managementObject.Properties) {
-                        break;
-                    } // foreach (ManagementObject managementObject in searcher.Get()) {
-                } // using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
-
-                Console.WriteLine($"Processor: Manufacturer: {(!string.IsNullOrWhiteSpace(processorManufacturer) ? processorManufacturer : "N/A")} Description: {(!string.IsNullOrWhiteSpace(processorDescription) ? processorDescription : "N/A")}");
-
-                if (string.IsNullOrWhiteSpace(processorManufacturer)) {
-                    speculativeExecutionAssessment.ErrorMessage = "Unable to get Processor Manufacturer from WMI";
-                }
-                if (string.Equals(processorManufacturer, "AuthenticAMD", StringComparison.OrdinalIgnoreCase)) {
-                    speculativeExecutionAssessment.KVAShadowRequired = false;
-                    return;
-                }
-                if (!string.Equals(processorManufacturer, "GenuineIntel", StringComparison.OrdinalIgnoreCase)) {
-                    speculativeExecutionAssessment.ErrorMessage = $"Unsupported processor manufacturer: {processorManufacturer}";
-                }
-
-                if (string.IsNullOrWhiteSpace(processorDescription)) {
-                    speculativeExecutionAssessment.ErrorMessage = "Unable to get Processor Description from WMI";
-                    return;
-                }
-
-                if (processorDescription.IndexOf("Family") == -1) {
-                    speculativeExecutionAssessment.ErrorMessage = "Processor Description from WMI does not contain Family";
-                    return;
-                }
-
-                if (processorDescription.IndexOf("Model") == -1) {
-                    speculativeExecutionAssessment.ErrorMessage = "Processor Description from WMI does not contain Model";
-                    return;
-                }
-
-                // Example processor description:
-                // Intel64 Family 6 Model 58 Stepping 9
-
-                processorDescription = processorDescription.Substring(processorDescription.IndexOf("Family"));
-                if (processorDescription.IndexOf("Stepping", StringComparison.OrdinalIgnoreCase) > -1) {
-                    processorDescription = processorDescription.Substring(0, processorDescription.IndexOf("Stepping", StringComparison.OrdinalIgnoreCase));
-                }
-                processorDescription = processorDescription.Trim();
-                // Family 6 Model 58
-
-                var processorDescriptionElements = processorDescription.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (processorDescriptionElements.Length == 4) {
-                    if (!int.TryParse(processorDescriptionElements[1], out int processorFamily)) {
-                        speculativeExecutionAssessment.ErrorMessage = $"Unable to parse numeric Processor Family from WMI Description: {processorDescription}";
-                        return;
-                    }
-                    if (!int.TryParse(processorDescriptionElements[3], out int processorModel)) {
-                        speculativeExecutionAssessment.ErrorMessage = $"Unable to parse numeric Processor Model from WMI Description: {processorDescription}";
-                        return;
-                    }
-
-                    if (processorFamily == 0x6) {
-                        if ((processorModel == 0x1C) || (processorModel == 0x26) || (processorModel == 0x27)
-                            || (processorModel == 0x36) || (processorModel == 0x35)) {
-                            speculativeExecutionAssessment.KVAShadowRequired = false;
-                        }
-                    }
-                }
-                else {
-                    speculativeExecutionAssessment.ErrorMessage = $"Unable to parse expected number (four) elements from from WMI Processor Description: {processorDescription}";
-                }
-            }
-            catch (Exception e) {
-                speculativeExecutionAssessment.ErrorMessage = $"Exception: {e.Message} TargetSite: {e.TargetSite.Name}";
-            }
-
         }
 
         private static string GetWindowsProductTypeWmiInformation(out int productType) {
