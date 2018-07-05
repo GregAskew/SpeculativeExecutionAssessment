@@ -18,13 +18,14 @@
     ///  CVE-2017-5715 (branch target injection)
     ///  CVE-2017-5753 (bounds check bypass)
     ///  CVE-2017-5754 (rogue data cache load)
+    ///  CVE-2018-3639 (speculative store bypass)
     /// </summary>
     /// <remarks>
     /// WARNING: Ensure that "Prefer 32-bit" is not checked in the build options.
     /// Requires elevated permissions.
     /// Mitigation requires:
-    ///  1. Set the registry value indicating the antivirus/security product is compatible with the Windows update.
-    ///  2. Install the Windows operating system update (part of the January 2018 Cumulative Update).
+    ///  1. Set the registry value indicating the antivirus/security product is compatible with the Windows update. (no longer required)
+    ///  2. Install the Windows operating system update.
     ///  3. Create the registry settings to enable the mitigation.
     ///  4. Update the hardware/firmware.
     ///  5. On virtual platforms, the hypervisor must be updated (or for Hyper-V, it may be reconfigured).
@@ -35,6 +36,10 @@
     /// https://support.microsoft.com/en-us/help/4072698/windows-server-guidance-to-protect-against-the-speculative-execution
     /// https://support.microsoft.com/en-gb/help/4073119/protect-against-speculative-execution-side-channel-vulnerabilities-in
 	/// https://blogs.technet.microsoft.com/srd/2018/03/23/kva-shadow-mitigating-meltdown-on-windows/
+    /// https://blogs.technet.microsoft.com/srd/2018/05/21/analysis-and-mitigation-of-speculative-store-bypass-cve-2018-3639/
+    /// ADV180012 | Microsoft Guidance for Speculative Store Bypass
+    /// https://portal.msrc.microsoft.com/en-us/security-guidance/advisory/adv180012
+    /// --
     /// https://community.hpe.com/t5/Servers-The-Right-Compute/Resources-to-help-mitigate-Speculative-Execution-vulnerability/ba-p/6992955
     /// https://support.microsoft.com/kn-in/help/4073225/guidance-for-sql-server
     /// https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/cve-2017-5715-and-hyper-v-vms
@@ -68,7 +73,8 @@
                         actions.Add("Install BIOS/firmware update provided by your device OEM that enables hardware support for the branch target injection mitigation.");
                     }
 
-                    if (!speculativeExecutionAssessment.BTIWindowsSupportPresent || !speculativeExecutionAssessment.KVAShadowWindowsSupportPresent) {
+                    if (!speculativeExecutionAssessment.BTIWindowsSupportPresent || !speculativeExecutionAssessment.KVAShadowWindowsSupportPresent
+                        || !speculativeExecutionAssessment.SSBDAvailable) {
                         actions.Add("Install the latest available updates for Windows with support for speculation control mitigations.");
                     }
 
@@ -169,6 +175,10 @@
                     Debug.WriteLine($"HwMode1Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode1Present)}");
                     Debug.WriteLine($"HwMode2Present: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
                     Debug.WriteLine($"SmepPresent: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFHwMode2Present)}");
+                    Debug.WriteLine($"SSBDAvailable: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFSSBDAvailable)}");
+                    Debug.WriteLine($"SSBDSupported: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFSSBDSupported)}");
+                    Debug.WriteLine($"SSBDSystemWide: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFSSBDSystemWide)}");
+                    Debug.WriteLine($"SSBDRequired: {speculativeExecutionAssessment.BTIFlags.HasFlag(BTIFlags.SCFSSBDRequired)}");
                     #endregion
 
                     Console.Write("Hardware support for branch target injection mitigation is present: ");
@@ -200,6 +210,35 @@
                     }
                     #endregion
 
+                    Console.WriteLine("Speculation control settings for CVE-2018-3639 [speculative store bypass]");
+                    Console.WriteLine();
+                    Console.ResetColor();
+
+                    Console.Write("Windows OS support for speculative store bypass mitigation is present: ");
+                    Console.ForegroundColor = speculativeExecutionAssessment.SSBDAvailable ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine(speculativeExecutionAssessment.SSBDAvailable.ToString().ToUpperInvariant());
+                    Console.ResetColor();
+
+                    Console.Write("Hardware is vulnerable to speculative store bypass: ");
+                    var ssbdRequired = speculativeExecutionAssessment.SSBDRequired.HasValue
+                        ? speculativeExecutionAssessment.SSBDRequired.Value.ToString().ToUpperInvariant()
+                        : "UNKNOWN";
+                    Console.ForegroundColor = speculativeExecutionAssessment.SSBDRequired.HasValue && !speculativeExecutionAssessment.SSBDRequired.Value 
+                        ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine(ssbdRequired);
+                    Console.ResetColor();
+
+                    if (speculativeExecutionAssessment.SSBDRequired.HasValue && speculativeExecutionAssessment.SSBDRequired.Value) {
+                        Console.Write("Hardware support for speculative store bypass mitigation is present: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDHardwarePresent ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.WriteLine(speculativeExecutionAssessment.SSBDHardwarePresent.ToString().ToUpperInvariant());
+                        Console.ResetColor();
+
+                        Console.Write("Windows OS support for speculative store bypass mitigation is enabled system-wide: ");
+                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDSystemWide ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.WriteLine(speculativeExecutionAssessment.SSBDSystemWide.ToString().ToUpperInvariant());
+                        Console.ResetColor();
+                    }
                 }
             }
             finally {

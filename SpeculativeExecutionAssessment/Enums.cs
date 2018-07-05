@@ -12,7 +12,11 @@ namespace SpeculativeExecutionAssessment {
         SCFHwReg2Enumerated = 0x00000010,
         SCFHwMode1Present = 0x00000020,
         SCFHwMode2Present = 0x00000040,
-        SCFSmepPresent = 0x00000080
+        SCFSmepPresent = 0x00000080,
+        SCFSSBDAvailable = 0x00000100,
+        SCFSSBDSupported = 0x00000200,
+        SCFSSBDSystemWide = 0x00000400,
+        SCFSSBDRequired = 0x00001000
     }
 
     [Flags]

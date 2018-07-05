@@ -146,6 +146,31 @@
         public bool KVAShadowWindowsSupportPresent { get; set; }
         #endregion
 
+        #region SSBD properties
+        /// <summary>
+        /// True if Windows OS support for speculative store bypass mitigation is present.
+        /// </summary>
+        public bool SSBDAvailable { get; set; }
+
+        /// <summary>
+        /// True if hardware support for speculative store bypass mitigation is present
+        /// </summary>
+        public bool SSBDHardwarePresent { get; set; }
+
+        /// <summary>
+        /// True if Windows OS support for speculative store bypass mitigation is enabled system-wide
+        /// This requires installing the operating system update, and setting the registry values:
+        /// HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management!FeatureSettingsOverride REG_DWORD 8
+        /// HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management!FeatureSettingsOverrideMask REG_DWORD 3
+        /// </summary>
+        public bool SSBDSystemWide { get; set; }
+
+        /// <summary>
+        /// True if the hardware is vulnerable to speculative store bypass
+        /// </summary>
+        public bool? SSBDRequired { get; set; }
+
+        #endregion
         #endregion
 
         #region Constructor
@@ -293,6 +318,13 @@
             if (!this.BTIWindowsSupportEnabled) {
                 this.BTIDisabledBySystemPolicy = this.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledSystemPolicy);
                 this.BTIDisabledByNoHardwareSupport = this.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledNoHardwareSupport);
+            }
+
+            if (this.BTIFlags.HasFlag(BTIFlags.SCFSSBDAvailable)) {
+                this.SSBDAvailable = true;
+                this.SSBDHardwarePresent = this.BTIFlags.HasFlag(BTIFlags.SCFSSBDSupported);
+                this.SSBDSystemWide = this.BTIFlags.HasFlag(BTIFlags.SCFSSBDSystemWide);
+                this.SSBDRequired = this.BTIFlags.HasFlag(BTIFlags.SCFSSBDRequired);
             }
         }
 
