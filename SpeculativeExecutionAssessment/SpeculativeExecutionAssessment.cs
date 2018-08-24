@@ -171,6 +171,31 @@
         public bool? SSBDRequired { get; set; }
 
         #endregion
+
+        #region L1 Terminal Fault Members
+
+        /// <summary>
+        /// True if L1 Terminal Fault mitigation is required
+        /// </summary>
+        public bool L1TFRequired { get; set; }
+
+        /// <summary>
+        /// True if L1 Terminal Fault mitigation is present
+        /// </summary>
+        public bool L1TFMitigationPresent { get; set; }
+
+        /// <summary>
+        /// True if L1 Terminal Fault mitigation is enabled
+        /// </summary>
+        public bool L1TFMitigationEnabled { get; set; }
+
+        /// <summary>
+        /// True if L1 Terminal Fault flush is supported
+        /// </summary>
+        public bool L1TFFlushSupported { get; set; }
+
+        public uint? L1TFInvalidPTEBit { get; set; }
+        #endregion
         #endregion
 
         #region Constructor
@@ -181,6 +206,8 @@
 
             this.BTIDisabledByNoHardwareSupport = true;
             this.KVAShadowRequired = true;
+
+            this.L1TFRequired = true;
         }
         #endregion
 
@@ -295,7 +322,7 @@
 
         internal void SetBranchTargetInjectionProperties(IntPtr systemInformationPtr) {
             if (systemInformationPtr == null) {
-                throw new ArgumentNullException("systemInformationPointer");
+                throw new ArgumentNullException(nameof(systemInformationPtr));
             }
 
             this.BTIFlags = (BTIFlags)(uint)Marshal.ReadInt32(systemInformationPtr);
@@ -330,10 +357,11 @@
 
         internal void SetKernelVAShadowProperties(IntPtr systemInformationPtr) {
             if (systemInformationPtr == null) {
-                throw new ArgumentNullException("systemInformationPointer");
+                throw new ArgumentNullException(nameof(systemInformationPtr));
             }
 
-            this.KernelVAFlags = (KernelVAFlags)(uint)Marshal.ReadInt32(systemInformationPtr);
+            uint systemInformation = (uint)Marshal.ReadInt32(systemInformationPtr);
+            this.KernelVAFlags = (KernelVAFlags)systemInformation;
             if (!this.IsEnumValid<KernelVAFlags>(this.KernelVAFlags)) {
                 var message = $"IsEnumValid<KernelVAFlags>(this.KernelVAFlags) returned false. KernelVAFlags value: {this.KernelVAFlags}";
                 this.ErrorMessage = message;
@@ -361,8 +389,23 @@
                     return;
                 }
             }
-        }
 
+            this.L1TFRequired = this.KVAShadowRequired;
+
+            uint l1TFInvalidPTEBitShift = 0x00000006;
+            uint l1TFInvalidPTEBitMask = 0x00000FC0;
+
+            this.L1TFInvalidPTEBit = ((uint)this.KernelVAFlags & l1TFInvalidPTEBitMask)
+                >> (int)l1TFInvalidPTEBitShift;
+
+            this.L1TFMitigationEnabled = this.L1TFInvalidPTEBit.HasValue && this.L1TFInvalidPTEBit != 0;
+            this.L1TFFlushSupported = this.KernelVAFlags.HasFlag(KernelVAFlags.L1TFFlushSupported);
+
+            if (this.KernelVAFlags.HasFlag(KernelVAFlags.L1TFMitigationPresent)
+                || this.L1TFMitigationEnabled || this.L1TFFlushSupported) {
+                this.L1TFMitigationPresent = true;
+            }
+        }
         #endregion
     }
 }

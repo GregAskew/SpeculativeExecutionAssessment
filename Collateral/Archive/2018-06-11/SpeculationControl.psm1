@@ -9,21 +9,21 @@
 
   .PARAMETER Quiet
   This parameter suppresses host output that is displayed by default.
-
+  
   #>
 
   [CmdletBinding()]
   param (
     [switch]$Quiet
   )
-
+  
   process {
 
     $NtQSIDefinition = @'
     [DllImport("ntdll.dll")]
     public static extern int NtQuerySystemInformation(uint systemInformationClass, IntPtr systemInformation, uint systemInformationLength, IntPtr returnLength);
 '@
-
+    
     $ntdll = Add-Type -MemberDefinition $NtQSIDefinition -Name 'ntdll' -Namespace 'Win32' -PassThru
 
 
@@ -33,24 +33,23 @@
     $object = New-Object -TypeName PSObject
 
     try {
-
-        $cpu = Get-CimInstance Win32_Processor
+   
+        $cpu = Get-WmiObject Win32_Processor
 
         if ($cpu -is [array]) {
             $cpu = $cpu[0]
         }
 
         $manufacturer = $cpu.Manufacturer
-
+ 
         #
         # Query branch target injection information.
         #
 
         if ($Quiet -ne $true) {
-
-            Write-Host "For more information about the output below, please refer to https://support.microsoft.com/en-in/help/4074629" -ForegroundColor Cyan
-            Write-Host
+        
             Write-Host "Speculation control settings for CVE-2017-5715 [branch target injection]" -ForegroundColor Cyan
+            Write-Host "For more information about the output below, please refer to https://support.microsoft.com/en-in/help/4074629" -ForegroundColor Cyan
 
             if ($manufacturer -eq "AuthenticAMD") {
                 Write-Host "AMD CPU detected: mitigations for branch target injection on AMD CPUs have additional registry settings for this mitigation, please refer to FAQ #15 at https://portal.msrc.microsoft.com/en-us/security-guidance/advisory/ADV180002" -ForegroundColor Cyan
@@ -69,7 +68,7 @@
         $ssbdHardwarePresent = $false
         $ssbdSystemWide = $false
         $ssbdRequired = $null
-
+    
         [System.UInt32]$systemInformationClass = 201
         [System.UInt32]$systemInformationLength = 4
 
@@ -82,7 +81,7 @@
             throw (("Querying branch target injection information failed with error {0:X8}" -f $retval))
         }
         else {
-
+    
             [System.UInt32]$scfBpbEnabled = 0x01
             [System.UInt32]$scfBpbDisabledSystemPolicy = 0x02
             [System.UInt32]$scfBpbDisabledNoHardwareSupport = 0x04
@@ -91,6 +90,7 @@
             [System.UInt32]$scfHwMode1Present = 0x20
             [System.UInt32]$scfHwMode2Present = 0x40
             [System.UInt32]$scfSmepPresent = 0x80
+
             [System.UInt32]$scfSsbdAvailable = 0x100
             [System.UInt32]$scfSsbdSupported = 0x200
             [System.UInt32]$scfSsbdSystemWide = 0x400
@@ -135,13 +135,13 @@
             Write-Host "Hardware support for branch target injection mitigation is present:"($btiHardwarePresent)
             Write-Host "Windows OS support for branch target injection mitigation is present:"($btiWindowsSupportPresent)
             Write-Host "Windows OS support for branch target injection mitigation is enabled:"($btiWindowsSupportEnabled)
-
+  
             if ($btiWindowsSupportPresent -eq $true -and $btiWindowsSupportEnabled -eq $false) {
                 Write-Host -ForegroundColor Red "Windows OS support for branch target injection mitigation is disabled by system policy:"($btiDisabledBySystemPolicy)
                 Write-Host -ForegroundColor Red "Windows OS support for branch target injection mitigation is disabled by absence of hardware support:"($btiDisabledByNoHardwareSupport)
             }
         }
-
+        
         $object | Add-Member -MemberType NoteProperty -Name BTIHardwarePresent -Value $btiHardwarePresent
         $object | Add-Member -MemberType NoteProperty -Name BTIWindowsSupportPresent -Value $btiWindowsSupportPresent
         $object | Add-Member -MemberType NoteProperty -Name BTIWindowsSupportEnabled -Value $btiWindowsSupportEnabled
@@ -151,23 +151,17 @@
         #
         # Query kernel VA shadow information.
         #
-
+        
         if ($Quiet -ne $true) {
             Write-Host
             Write-Host "Speculation control settings for CVE-2017-5754 [rogue data cache load]" -ForegroundColor Cyan
-            Write-Host
+            Write-Host    
         }
 
         $kvaShadowRequired = $true
         $kvaShadowPresent = $false
         $kvaShadowEnabled = $false
         $kvaShadowPcidEnabled = $false
-
-        $l1tfRequired = $true
-        $l1tfMitigationPresent = $false
-        $l1tfMitigationEnabled = $false
-        $l1tfFlushSupported = $false
-        $l1tfInvalidPteBit = $null
 
         [System.UInt32]$systemInformationClass = 196
         [System.UInt32]$systemInformationLength = 4
@@ -180,7 +174,7 @@
             throw (("Querying kernel VA shadow information failed with error {0:X8}" -f $retval))
         }
         else {
-
+    
             [System.UInt32]$kvaShadowEnabledFlag = 0x01
             [System.UInt32]$kvaShadowUserGlobalFlag = 0x02
             [System.UInt32]$kvaShadowPcidFlag = 0x04
@@ -188,19 +182,12 @@
             [System.UInt32]$kvaShadowRequiredFlag = 0x10
             [System.UInt32]$kvaShadowRequiredAvailableFlag = 0x20
 
-            [System.UInt32]$l1tfInvalidPteBitMask = 0xfc0
-            [System.UInt32]$l1tfInvalidPteBitShift = 6
-            [System.UInt32]$l1tfFlushSupportedFlag = 0x1000
-            [System.UInt32]$l1tfMitigationPresentFlag = 0x2000
-
             [System.UInt32]$flags = [System.UInt32][System.Runtime.InteropServices.Marshal]::ReadInt32($systemInformationPtr)
-
-			Write-Host "KVAShadow flags             :" $flags
 
             $kvaShadowPresent = $true
             $kvaShadowEnabled = (($flags -band $kvaShadowEnabledFlag) -ne 0)
             $kvaShadowPcidEnabled = ((($flags -band $kvaShadowPcidFlag) -ne 0) -and (($flags -band $kvaShadowInvpcidFlag) -ne 0))
-
+            
             if (($flags -band $kvaShadowRequiredAvailableFlag) -ne 0) {
                 $kvaShadowRequired = (($flags -band $kvaShadowRequiredFlag) -ne 0)
             }
@@ -212,13 +199,13 @@
                 elseif ($manufacturer -eq "GenuineIntel") {
                     $regex = [regex]'Family (\d+) Model (\d+) Stepping (\d+)'
                     $result = $regex.Match($cpu.Description)
-
+            
                     if ($result.Success) {
                         $family = [System.UInt32]$result.Groups[1].Value
                         $model = [System.UInt32]$result.Groups[2].Value
                         $stepping = [System.UInt32]$result.Groups[3].Value
-
-                        if (($family -eq 0x6) -and
+                
+                        if (($family -eq 0x6) -and 
                             (($model -eq 0x1c) -or
                              ($model -eq 0x26) -or
                              ($model -eq 0x27) -or
@@ -234,19 +221,6 @@
                 }
             }
 
-            $l1tfRequired = $kvaShadowRequired
-
-            $l1tfInvalidPteBit = ($flags -band $l1tfInvalidPteBitMask) -shr $l1tfInvalidPteBitShift
-
-            $l1tfMitigationEnabled = ($l1tfInvalidPteBit -ne 0)
-            $l1tfFlushSupported = (($flags -band $l1tfFlushSupportedFlag) -ne 0)
-
-            if (($flags -band $l1tfMitigationPresentFlag) -or
-                ($l1tfMitigationEnabled -eq $true) -or
-                ($l1tfFlushSupported -eq $true)) {
-                $l1tfMitigationPresent = $true
-            }
-
             if ($Quiet -ne $true -and $PSBoundParameters['Verbose']) {
                 Write-Host "KvaShadowEnabled             :" (($flags -band $kvaShadowEnabledFlag) -ne 0)
                 Write-Host "KvaShadowUserGlobal          :" (($flags -band $kvaShadowUserGlobalFlag) -ne 0)
@@ -254,12 +228,9 @@
                 Write-Host "KvaShadowInvpcid             :" (($flags -band $kvaShadowInvpcidFlag) -ne 0)
                 Write-Host "KvaShadowRequired            :" $kvaShadowRequired
                 Write-Host "KvaShadowRequiredAvailable   :" (($flags -band $kvaShadowRequiredAvailableFlag) -ne 0)
-                Write-Host "L1tfRequired                 :" $l1tfRequired
-                Write-Host "L1tfInvalidPteBit            :" $l1tfInvalidPteBit
-                Write-Host "L1tfFlushSupported           :" $l1tfFlushSupported
             }
         }
-
+        
         if ($Quiet -ne $true) {
             Write-Host "Hardware requires kernel VA shadowing:"$kvaShadowRequired
 
@@ -273,7 +244,7 @@
                 }
             }
         }
-
+        
         $object | Add-Member -MemberType NoteProperty -Name KVAShadowRequired -Value $kvaShadowRequired
         $object | Add-Member -MemberType NoteProperty -Name KVAShadowWindowsSupportPresent -Value $kvaShadowPresent
         $object | Add-Member -MemberType NoteProperty -Name KVAShadowWindowsSupportEnabled -Value $kvaShadowEnabled
@@ -282,24 +253,24 @@
         #
         # Speculation Control Settings for CVE-2018-3639 (Speculative Store Bypass)
         #
-
+        
         if ($Quiet -ne $true) {
             Write-Host
             Write-Host "Speculation control settings for CVE-2018-3639 [speculative store bypass]" -ForegroundColor Cyan
-            Write-Host
+            Write-Host    
         }
-
+        
         if ($Quiet -ne $true) {
             if (($ssbdAvailable -eq $true)) {
                 Write-Host "Hardware is vulnerable to speculative store bypass:"$ssbdRequired
                 if ($ssbdRequired -eq $true) {
-                    Write-Host "Hardware support for speculative store bypass disable is present:"$ssbdHardwarePresent
-                    Write-Host "Windows OS support for speculative store bypass disable is present:"$ssbdAvailable
-                    Write-Host "Windows OS support for speculative store bypass disable is enabled system-wide:"$ssbdSystemWide
+                    Write-Host "Hardware support for speculative store bypass mitigation is present:"$ssbdHardwarePresent
+                    Write-Host "Windows OS support for speculative store bypass mitigation is present:"$ssbdAvailable
+                    Write-Host "Windows OS support for speculative store bypass mitigation is enabled system-wide:"$ssbdSystemWide
                 }
             }
             else {
-                Write-Host "Windows OS support for speculative store bypass disable is present:"$ssbdAvailable
+                Write-Host "Windows OS support for speculative store bypass mitigation is present:"$ssbdAvailable
             }
         }
 
@@ -308,57 +279,28 @@
         $object | Add-Member -MemberType NoteProperty -Name SSBDHardwarePresent -Value $ssbdHardwarePresent
         $object | Add-Member -MemberType NoteProperty -Name SSBDWindowsSupportEnabledSystemWide -Value $ssbdSystemWide
 
-
-        #
-        # Speculation Control Settings for CVE-2018-3620 (L1 Terminal Fault)
-        #
-
-        if ($Quiet -ne $true) {
-            Write-Host
-            Write-Host "Speculation control settings for CVE-2018-3620 [L1 terminal fault]" -ForegroundColor Cyan
-            Write-Host
-        }
-
-        if ($Quiet -ne $true) {
-            Write-Host "Hardware is vulnerable to L1 terminal fault:"$l1tfRequired
-
-            if ($l1tfRequired -eq $true) {
-                Write-Host "Windows OS support for L1 terminal fault mitigation is present:"$l1tfMitigationPresent
-                Write-Host "Windows OS support for L1 terminal fault mitigation is enabled:"$l1tfMitigationEnabled
-            }
-        }
-
-        $object | Add-Member -MemberType NoteProperty -Name L1TFHardwareVulnerable -Value $l1tfRequired
-        $object | Add-Member -MemberType NoteProperty -Name L1TFWindowsSupportPresent -Value $l1tfMitigationPresent
-        $object | Add-Member -MemberType NoteProperty -Name L1TFWindowsSupportEnabled -Value $l1tfMitigationEnabled
-        $object | Add-Member -MemberType NoteProperty -Name L1TFInvalidPteBit -Value $l1tfInvalidPteBit
-        $object | Add-Member -MemberType NoteProperty -Name L1DFlushSupported -Value $l1tfFlushSupported
-
         #
         # Provide guidance as appropriate.
         #
 
         $actions = @()
-
+        
         if ($btiHardwarePresent -eq $false) {
             $actions += "Install BIOS/firmware update provided by your device OEM that enables hardware support for the branch target injection mitigation."
         }
 
-        if (($btiWindowsSupportPresent -eq $false) -or
+        if (($btiWindowsSupportPresent -eq $false) -or 
             ($kvaShadowPresent -eq $false) -or
-            ($ssbdAvailable -eq $false) -or
-            ($l1tfMitigationPresent -eq $false)) {
+            ($ssbdAvailable -eq $false)) {
             $actions += "Install the latest available updates for Windows with support for speculation control mitigations."
         }
 
-        if (($btiHardwarePresent -eq $true -and $btiWindowsSupportEnabled -eq $false) -or
-            ($kvaShadowRequired -eq $true -and $kvaShadowEnabled -eq $false) -or
-            ($l1tfRequired -eq $true -and $l1tfMitigationEnabled -eq $false)) {
+        if (($btiHardwarePresent -eq $true -and $btiWindowsSupportEnabled -eq $false) -or ($kvaShadowRequired -eq $true -and $kvaShadowEnabled -eq $false)) {
             $guidanceUri = ""
             $guidanceType = ""
 
-
-            $os = Get-CimInstance Win32_OperatingSystem
+            
+            $os = Get-WmiObject Win32_OperatingSystem
 
             if ($os.ProductType -eq 1) {
                 # Workstation
@@ -378,7 +320,7 @@
 
             Write-Host
             Write-Host "Suggested actions" -ForegroundColor Cyan
-            Write-Host
+            Write-Host 
 
             foreach ($action in $actions) {
                 Write-Host " *" $action
@@ -393,19 +335,19 @@
         if ($systemInformationPtr -ne [System.IntPtr]::Zero) {
             [System.Runtime.InteropServices.Marshal]::FreeHGlobal($systemInformationPtr)
         }
-
+ 
         if ($returnLengthPtr -ne [System.IntPtr]::Zero) {
             [System.Runtime.InteropServices.Marshal]::FreeHGlobal($returnLengthPtr)
         }
-    }
+    }    
   }
 }
 
 # SIG # Begin signature block
-# MIIdhQYJKoZIhvcNAQcCoIIddjCCHXICAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# MIIdhwYJKoZIhvcNAQcCoIIdeDCCHXQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUY4g8OGRbQRd9YHIqMupziFen
-# 0kCgghhTMIIEwzCCA6ugAwIBAgITMwAAAMvZUgZTvz4qWQAAAAAAyzANBgkqhkiG
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUt7FBwSPz7mDEMj0TIS1+Hjg3
+# FNCgghhVMIIEwzCCA6ugAwIBAgITMwAAAMvZUgZTvz4qWQAAAAAAyzANBgkqhkiG
 # 9w0BAQUFADB3MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4G
 # A1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSEw
 # HwYDVQQDExhNaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EwHhcNMTYwOTA3MTc1ODU1
@@ -430,134 +372,134 @@
 # /mGWSfY2rZRgSwUKbPIGVz1IgHaOm089sb6Q6yC4EkEOAxTrhBS/4SZeTM2RuT0o
 # 8rFtffWR4sW8SrpgvRQuz28WAu2wDZ3XTTvAmiF+cjumrx6fA8UaLhYG6LWvJZT6
 # zrlsZ8DcTZMwZLnw6tKSiqvb6gvIcyDTcVj25GRul3yzLfgsmLWGTRN7woCSGzfd
-# gykqBndYo4OS6E0ssxjPR8zJw0DbhJjvUMtJ/egwggX/MIID56ADAgECAhMzAAAB
-# A14lHJkfox64AAAAAAEDMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNVBAYTAlVTMRMw
+# gykqBndYo4OS6E0ssxjPR8zJw0DbhJjvUMtJ/egwggYBMIID6aADAgECAhMzAAAA
+# xOmJ+HqBUOn/AAAAAADEMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNVBAYTAlVTMRMw
 # EQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNp
-# Z25pbmcgUENBIDIwMTEwHhcNMTgwNzEyMjAwODQ4WhcNMTkwNzI2MjAwODQ4WjB0
+# Z25pbmcgUENBIDIwMTEwHhcNMTcwODExMjAyMDI0WhcNMTgwODExMjAyMDI0WjB0
 # MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVk
 # bW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMR4wHAYDVQQDExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
-# AoIBAQDRlHY25oarNv5p+UZ8i4hQy5Bwf7BVqSQdfjnnBZ8PrHuXss5zCvvUmyRc
-# FrU53Rt+M2wR/Dsm85iqXVNrqsPsE7jS789Xf8xly69NLjKxVitONAeJ/mkhvT5E
-# +94SnYW/fHaGfXKxdpth5opkTEbOttU6jHeTd2chnLZaBl5HhvU80QnKDT3Nsumh
-# UHjRhIjiATwi/K+WCMxdmcDt66VamJL1yEBOanOv3uN0etNfRpe84mcod5mswQ4x
-# Fo8ADwH+S15UD8rEZT8K46NG2/YsAzoZvmgFFpzmfzS/p4eNZTkmyWPU78XdvSX+
-# /Sj0NIZ5rCrVXzCRO+QUauuxygQjAgMBAAGjggF+MIIBejAfBgNVHSUEGDAWBgor
-# BgEEAYI3TAgBBggrBgEFBQcDAzAdBgNVHQ4EFgQUR77Ay+GmP/1l1jjyA123r3f3
-# QP8wUAYDVR0RBEkwR6RFMEMxKTAnBgNVBAsTIE1pY3Jvc29mdCBPcGVyYXRpb25z
-# IFB1ZXJ0byBSaWNvMRYwFAYDVQQFEw0yMzAwMTIrNDM3OTY1MB8GA1UdIwQYMBaA
-# FEhuZOVQBdOCqhc3NyK1bajKdQKVMFQGA1UdHwRNMEswSaBHoEWGQ2h0dHA6Ly93
-# d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY0NvZFNpZ1BDQTIwMTFfMjAx
-# MS0wNy0wOC5jcmwwYQYIKwYBBQUHAQEEVTBTMFEGCCsGAQUFBzAChkVodHRwOi8v
-# d3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NlcnRzL01pY0NvZFNpZ1BDQTIwMTFf
-# MjAxMS0wNy0wOC5jcnQwDAYDVR0TAQH/BAIwADANBgkqhkiG9w0BAQsFAAOCAgEA
-# n/XJUw0/DSbsokTYDdGfY5YGSz8eXMUzo6TDbK8fwAG662XsnjMQD6esW9S9kGEX
-# 5zHnwya0rPUn00iThoj+EjWRZCLRay07qCwVlCnSN5bmNf8MzsgGFhaeJLHiOflu
-# DnjYDBu2KWAndjQkm925l3XLATutghIWIoCJFYS7mFAgsBcmhkmvzn1FFUM0ls+B
-# XBgs1JPyZ6vic8g9o838Mh5gHOmwGzD7LLsHLpaEk0UoVFzNlv2g24HYtjDKQ7Hz
-# SMCyRhxdXnYqWJ/U7vL0+khMtWGLsIxB6aq4nZD0/2pCD7k+6Q7slPyNgLt44yOn
-# eFuybR/5WcF9ttE5yXnggxxgCto9sNHtNr9FB+kbNm7lPTsFA6fUpyUSj+Z2oxOz
-# RVpDMYLa2ISuubAfdfX2HX1RETcn6LU1hHH3V6qu+olxyZjSnlpkdr6Mw30VapHx
-# FPTy2TUxuNty+rR1yIibar+YRcdmstf/zpKQdeTr5obSyBvbJ8BblW9Jb1hdaSre
-# U0v46Mp79mwV+QMZDxGFqk+av6pX3WDG9XEg9FGomsrp0es0Rz11+iLsVT9qGTlr
-# EOlaP470I3gwsvKmOMs1jaqYWSRAuDpnpAdfoP7YO0kT+wzh7Qttg1DO8H8+4NkI
-# 6IwhSkHC3uuOW+4Dwx1ubuZUNWZncnwa6lL2IsRyP64wggYHMIID76ADAgECAgph
-# Fmg0AAAAAAAcMA0GCSqGSIb3DQEBBQUAMF8xEzARBgoJkiaJk/IsZAEZFgNjb20x
-# GTAXBgoJkiaJk/IsZAEZFgltaWNyb3NvZnQxLTArBgNVBAMTJE1pY3Jvc29mdCBS
-# b290IENlcnRpZmljYXRlIEF1dGhvcml0eTAeFw0wNzA0MDMxMjUzMDlaFw0yMTA0
-# MDMxMzAzMDlaMHcxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAw
+# AoIBAQCIirgkwwePmoB5FfwmYPxyiCz69KOXiJZGt6PLX4kvOjMuHpF4+nypH4IB
+# tXrLGrwDykbrxZn3+wQd8oUK/yJuofJnPcUnGOUoH/UElEFj7OO6FYztE5o13jhw
+# VG877K1FCTBJwb6PMJkMy3bJ93OVFnfRi7uUxwiFIO0eqDXxccLgdABLitLckevW
+# eP6N+q1giD29uR+uYpe/xYSxkK7WryvTVPs12s1xkuYe/+xxa8t/CHZ04BBRSNTx
+# AMhITKMHNeVZDf18nMjmWuOF9daaDx+OpuSEF8HWyp8dAcf9SKcTkjOXIUgy+MIk
+# ogCyvlPKg24pW4HvOG6A87vsEwvrAgMBAAGjggGAMIIBfDAfBgNVHSUEGDAWBgor
+# BgEEAYI3TAgBBggrBgEFBQcDAzAdBgNVHQ4EFgQUy9ZihM9gOer/Z8Jc0si7q7fD
+# E5gwUgYDVR0RBEswSaRHMEUxDTALBgNVBAsTBE1PUFIxNDAyBgNVBAUTKzIzMDAx
+# MitjODA0YjVlYS00OWI0LTQyMzgtODM2Mi1kODUxZmEyMjU0ZmMwHwYDVR0jBBgw
+# FoAUSG5k5VAF04KqFzc3IrVtqMp1ApUwVAYDVR0fBE0wSzBJoEegRYZDaHR0cDov
+# L3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jcmwvTWljQ29kU2lnUENBMjAxMV8y
+# MDExLTA3LTA4LmNybDBhBggrBgEFBQcBAQRVMFMwUQYIKwYBBQUHMAKGRWh0dHA6
+# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMvTWljQ29kU2lnUENBMjAx
+# MV8yMDExLTA3LTA4LmNydDAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3DQEBCwUAA4IC
+# AQAGFh/bV8JQyCNPolF41+34/c291cDx+RtW7VPIaUcF1cTL7OL8mVuVXxE4KMAF
+# RRPgmnmIvGar27vrAlUjtz0jeEFtrvjxAFqUmYoczAmV0JocRDCppRbHukdb9Ss0
+# i5+PWDfDThyvIsoQzdiCEKk18K4iyI8kpoGL3ycc5GYdiT4u/1cDTcFug6Ay67Sz
+# L1BWXQaxFYzIHWO3cwzj1nomDyqWRacygz6WPldJdyOJ/rEQx4rlCBVRxStaMVs5
+# apaopIhrlihv8cSu6r1FF8xiToG1VBpHjpilbcBuJ8b4Jx/I7SCpC7HxzgualOJq
+# nWmDoTbXbSD+hdX/w7iXNgn+PRTBmBSpwIbM74LBq1UkQxi1SIV4htD50p0/GdkU
+# ieeNn2gkiGg7qceATibnCCFMY/2ckxVNM7VWYE/XSrk4jv8u3bFfpENryXjPsbtr
+# j4Nsh3Kq6qX7n90a1jn8ZMltPgjlfIOxrbyjunvPllakeljLEkdi0iHv/DzEMQv3
+# Lz5kpTdvYFA/t0SQT6ALi75+WPbHZ4dh256YxMiMy29H4cAulO2x9rAwbexqSajp
+# lnbIvQjE/jv1rnM3BrJWzxnUu/WUyocc8oBqAU+2G4Fzs9NbIj86WBjfiO5nxEmn
+# L9wliz1e0Ow0RJEdvJEMdoI+78TYLaEEAo5I+e/dAs8DojCCBgcwggPvoAMCAQIC
+# CmEWaDQAAAAAABwwDQYJKoZIhvcNAQEFBQAwXzETMBEGCgmSJomT8ixkARkWA2Nv
+# bTEZMBcGCgmSJomT8ixkARkWCW1pY3Jvc29mdDEtMCsGA1UEAxMkTWljcm9zb2Z0
+# IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5MB4XDTA3MDQwMzEyNTMwOVoXDTIx
+# MDQwMzEzMDMwOVowdzELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x
+# EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv
+# bjEhMB8GA1UEAxMYTWljcm9zb2Z0IFRpbWUtU3RhbXAgUENBMIIBIjANBgkqhkiG
+# 9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn6Fssd/bSJIqfGsuGeG94uPFmVEjUK3O3RhO
+# JA/u0afRTK10MCAR6wfVVJUVSZQbQpKumFwwJtoAa+h7veyJBw/3DgSY8InMH8sz
+# JIed8vRnHCz8e+eIHernTqOhwSNTyo36Rc8J0F6v0LBCBKL5pmyTZ9co3EZTsIbQ
+# 5ShGLieshk9VUgzkAyz7apCQMG6H81kwnfp+1pez6CGXfvjSE/MIt1NtUrRFkJ9I
+# AEpHZhEnKWaol+TTBoFKovmEpxFHFAmCn4TtVXj+AZodUAiFABAwRu233iNGu8Qt
+# VJ+vHnhBMXfMm987g5OhYQK1HQ2x/PebsgHOIktU//kFw8IgCwIDAQABo4IBqzCC
+# AacwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUIzT42VJGcArtQPt2+7MrsMM1
+# sw8wCwYDVR0PBAQDAgGGMBAGCSsGAQQBgjcVAQQDAgEAMIGYBgNVHSMEgZAwgY2A
+# FA6sgmBAVieX5SUT/CrhClOVWeSkoWOkYTBfMRMwEQYKCZImiZPyLGQBGRYDY29t
+# MRkwFwYKCZImiZPyLGQBGRYJbWljcm9zb2Z0MS0wKwYDVQQDEyRNaWNyb3NvZnQg
+# Um9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHmCEHmtFqFKoKWtTHNY9AcTLmUwUAYD
+# VR0fBEkwRzBFoEOgQYY/aHR0cDovL2NybC5taWNyb3NvZnQuY29tL3BraS9jcmwv
+# cHJvZHVjdHMvbWljcm9zb2Z0cm9vdGNlcnQuY3JsMFQGCCsGAQUFBwEBBEgwRjBE
+# BggrBgEFBQcwAoY4aHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraS9jZXJ0cy9N
+# aWNyb3NvZnRSb290Q2VydC5jcnQwEwYDVR0lBAwwCgYIKwYBBQUHAwgwDQYJKoZI
+# hvcNAQEFBQADggIBABCXisNcA0Q23em0rXfbznlRTQGxLnRxW20ME6vOvnuPuC7U
+# EqKMbWK4VwLLTiATUJndekDiV7uvWJoc4R0Bhqy7ePKL0Ow7Ae7ivo8KBciNSOLw
+# UxXdT6uS5OeNatWAweaU8gYvhQPpkSokInD79vzkeJkuDfcH4nC8GE6djmsKcpW4
+# oTmcZy3FUQ7qYlw/FpiLID/iBxoy+cwxSnYxPStyC8jqcD3/hQoT38IKYY7w17gX
+# 606Lf8U1K16jv+u8fQtCe9RTciHuMMq7eGVcWwEXChQO0toUmPU8uWZYsy0v5/mF
+# hsxRVuidcJRsrDlM1PZ5v6oYemIp76KbKTQGdxpiyT0ebR+C8AvHLLvPQ7Pl+ex9
+# teOkqHQ1uE7FcSMSJnYLPFKMcVpGQxS8s7OwTWfIn0L/gHkhgJ4VMGboQhJeGsie
+# IiHQQ+kr6bv0SMws1NgygEwmKkgkX1rqVu+m3pmdyjpvvYEndAYR7nYhv5uCwSdU
+# trFqPYmhdmG0bqETpr+qR/ASb/2KMmyy/t9RyIwjyWa9nR2HEmQCPS2vWY+45CHl
+# tbDKY7R4VAXUQS5QrJSwpXirs6CWdRrZkocTdSIvMqgIbqBbjCW/oO+EyiHW6x5P
+# yZruSeD3AWVviQt9yGnI5m7qp5fOMSn/DsVbXNhNG6HY+i+ePy5VFmvJE6P9MIIH
+# ejCCBWKgAwIBAgIKYQ6Q0gAAAAAAAzANBgkqhkiG9w0BAQsFADCBiDELMAkGA1UE
+# BhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAc
+# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0
+# IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IDIwMTEwHhcNMTEwNzA4MjA1OTA5
+# WhcNMjYwNzA4MjEwOTA5WjB+MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGlu
+# Z3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBv
+# cmF0aW9uMSgwJgYDVQQDEx9NaWNyb3NvZnQgQ29kZSBTaWduaW5nIFBDQSAyMDEx
+# MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAq/D6chAcLq3YbqqCEE00
+# uvK2WCGfQhsqa+laUKq4BjgaBEm6f8MMHt03a8YS2AvwOMKZBrDIOdUBFDFC04kN
+# eWSHfpRgJGyvnkmc6Whe0t+bU7IKLMOv2akrrnoJr9eWWcpgGgXpZnboMlImEi/n
+# qwhQz7NEt13YxC4Ddato88tt8zpcoRb0RrrgOGSsbmQ1eKagYw8t00CT+OPeBw3V
+# XHmlSSnnDb6gE3e+lD3v++MrWhAfTVYoonpy4BI6t0le2O3tQ5GD2Xuye4Yb2T6x
+# jF3oiU+EGvKhL1nkkDstrjNYxbc+/jLTswM9sbKvkjh+0p2ALPVOVpEhNSXDOW5k
+# f1O6nA+tGSOEy/S6A4aN91/w0FK/jJSHvMAhdCVfGCi2zCcoOCWYOUo2z3yxkq4c
+# I6epZuxhH2rhKEmdX4jiJV3TIUs+UsS1Vz8kA/DRelsv1SPjcF0PUUZ3s/gA4bys
+# AoJf28AVs70b1FVL5zmhD+kjSbwYuER8ReTBw3J64HLnJN+/RpnF78IcV9uDjexN
+# STCnq47f7Fufr/zdsGbiwZeBe+3W7UvnSSmnEyimp31ngOaKYnhfsi+E11ecXL93
+# KCjx7W3DKI8sj0A3T8HhhUSJxAlMxdSlQy90lfdu+HggWCwTXWCVmj5PM4TasIgX
+# 3p5O9JawvEagbJjS4NaIjAsCAwEAAaOCAe0wggHpMBAGCSsGAQQBgjcVAQQDAgEA
+# MB0GA1UdDgQWBBRIbmTlUAXTgqoXNzcitW2oynUClTAZBgkrBgEEAYI3FAIEDB4K
+# AFMAdQBiAEMAQTALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAfBgNVHSME
+# GDAWgBRyLToCMZBDuRQFTuHqp8cx0SOJNDBaBgNVHR8EUzBRME+gTaBLhklodHRw
+# Oi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNSb29DZXJB
+# dXQyMDExXzIwMTFfMDNfMjIuY3JsMF4GCCsGAQUFBwEBBFIwUDBOBggrBgEFBQcw
+# AoZCaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraS9jZXJ0cy9NaWNSb29DZXJB
+# dXQyMDExXzIwMTFfMDNfMjIuY3J0MIGfBgNVHSAEgZcwgZQwgZEGCSsGAQQBgjcu
+# AzCBgzA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
+# cy9kb2NzL3ByaW1hcnljcHMuaHRtMEAGCCsGAQUFBwICMDQeMiAdAEwAZQBnAGEA
+# bABfAHAAbwBsAGkAYwB5AF8AcwB0AGEAdABlAG0AZQBuAHQALiAdMA0GCSqGSIb3
+# DQEBCwUAA4ICAQBn8oalmOBUeRou09h0ZyKbC5YR4WOSmUKWfdJ5DJDBZV8uLD74
+# w3LRbYP+vj/oCso7v0epo/Np22O/IjWll11lhJB9i0ZQVdgMknzSGksc8zxCi1LQ
+# sP1r4z4HLimb5j0bpdS1HXeUOeLpZMlEPXh6I/MTfaaQdION9MsmAkYqwooQu6Sp
+# BQyb7Wj6aC6VoCo/KmtYSWMfCWluWpiW5IP0wI/zRive/DvQvTXvbiWu5a8n7dDd
+# 8w6vmSiXmE0OPQvyCInWH8MyGOLwxS3OW560STkKxgrCxq2u5bLZ2xWIUUVYODJx
+# Jxp/sfQn+N4sOiBpmLJZiWhub6e3dMNABQamASooPoI/E01mC8CzTfXhj38cbxV9
+# Rad25UAqZaPDXVJihsMdYzaXht/a8/jyFqGaJ+HNpZfQ7l1jQeNbB5yHPgZ3BtEG
+# sXUfFL5hYbXw3MYbBL7fQccOKO7eZS/sl/ahXJbYANahRr1Z85elCUtIEJmAH9AA
+# KcWxm6U/RXceNcbSoqKfenoi+kiVH6v7RyOA9Z74v2u3S5fi63V4GuzqN5l5GEv/
+# 1rMjaHXmr/r8i+sLgOppO6/8MO0ETI7f33VtY5E90Z1WTk+/gFcioXgRMiF670EK
+# sT/7qMykXcGhiJtXcVZOSEXAQsmbdlsKgEhr/Xmfwb1tbWrJUnMTDXpQzTGCBJww
+# ggSYAgEBMIGVMH4xCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAw
 # DgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24x
-# ITAfBgNVBAMTGE1pY3Jvc29mdCBUaW1lLVN0YW1wIFBDQTCCASIwDQYJKoZIhvcN
-# AQEBBQADggEPADCCAQoCggEBAJ+hbLHf20iSKnxrLhnhveLjxZlRI1Ctzt0YTiQP
-# 7tGn0UytdDAgEesH1VSVFUmUG0KSrphcMCbaAGvoe73siQcP9w4EmPCJzB/LMySH
-# nfL0Zxws/HvniB3q506jocEjU8qN+kXPCdBer9CwQgSi+aZsk2fXKNxGU7CG0OUo
-# Ri4nrIZPVVIM5AMs+2qQkDBuh/NZMJ36ftaXs+ghl3740hPzCLdTbVK0RZCfSABK
-# R2YRJylmqJfk0waBSqL5hKcRRxQJgp+E7VV4/gGaHVAIhQAQMEbtt94jRrvELVSf
-# rx54QTF3zJvfO4OToWECtR0Nsfz3m7IBziJLVP/5BcPCIAsCAwEAAaOCAaswggGn
-# MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCM0+NlSRnAK7UD7dvuzK7DDNbMP
-# MAsGA1UdDwQEAwIBhjAQBgkrBgEEAYI3FQEEAwIBADCBmAYDVR0jBIGQMIGNgBQO
-# rIJgQFYnl+UlE/wq4QpTlVnkpKFjpGEwXzETMBEGCgmSJomT8ixkARkWA2NvbTEZ
-# MBcGCgmSJomT8ixkARkWCW1pY3Jvc29mdDEtMCsGA1UEAxMkTWljcm9zb2Z0IFJv
-# b3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5ghB5rRahSqClrUxzWPQHEy5lMFAGA1Ud
-# HwRJMEcwRaBDoEGGP2h0dHA6Ly9jcmwubWljcm9zb2Z0LmNvbS9wa2kvY3JsL3By
-# b2R1Y3RzL21pY3Jvc29mdHJvb3RjZXJ0LmNybDBUBggrBgEFBQcBAQRIMEYwRAYI
-# KwYBBQUHMAKGOGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2kvY2VydHMvTWlj
-# cm9zb2Z0Um9vdENlcnQuY3J0MBMGA1UdJQQMMAoGCCsGAQUFBwMIMA0GCSqGSIb3
-# DQEBBQUAA4ICAQAQl4rDXANENt3ptK132855UU0BsS50cVttDBOrzr57j7gu1BKi
-# jG1iuFcCy04gE1CZ3XpA4le7r1iaHOEdAYasu3jyi9DsOwHu4r6PCgXIjUji8FMV
-# 3U+rkuTnjWrVgMHmlPIGL4UD6ZEqJCJw+/b85HiZLg33B+JwvBhOnY5rCnKVuKE5
-# nGctxVEO6mJcPxaYiyA/4gcaMvnMMUp2MT0rcgvI6nA9/4UKE9/CCmGO8Ne4F+tO
-# i3/FNSteo7/rvH0LQnvUU3Ih7jDKu3hlXFsBFwoUDtLaFJj1PLlmWLMtL+f5hYbM
-# UVbonXCUbKw5TNT2eb+qGHpiKe+imyk0BncaYsk9Hm0fgvALxyy7z0Oz5fnsfbXj
-# pKh0NbhOxXEjEiZ2CzxSjHFaRkMUvLOzsE1nyJ9C/4B5IYCeFTBm6EISXhrIniIh
-# 0EPpK+m79EjMLNTYMoBMJipIJF9a6lbvpt6Znco6b72BJ3QGEe52Ib+bgsEnVLax
-# aj2JoXZhtG6hE6a/qkfwEm/9ijJssv7fUciMI8lmvZ0dhxJkAj0tr1mPuOQh5bWw
-# ymO0eFQF1EEuUKyUsKV4q7OglnUa2ZKHE3UiLzKoCG6gW4wlv6DvhMoh1useT8ma
-# 7kng9wFlb4kLfchpyOZu6qeXzjEp/w7FW1zYTRuh2Povnj8uVRZryROj/TCCB3ow
-# ggVioAMCAQICCmEOkNIAAAAAAAMwDQYJKoZIhvcNAQELBQAwgYgxCzAJBgNVBAYT
-# AlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBS
-# b290IENlcnRpZmljYXRlIEF1dGhvcml0eSAyMDExMB4XDTExMDcwODIwNTkwOVoX
-# DTI2MDcwODIxMDkwOVowfjELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0
-# b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3Jh
-# dGlvbjEoMCYGA1UEAxMfTWljcm9zb2Z0IENvZGUgU2lnbmluZyBQQ0EgMjAxMTCC
-# AiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAKvw+nIQHC6t2G6qghBNNLry
-# tlghn0IbKmvpWlCquAY4GgRJun/DDB7dN2vGEtgL8DjCmQawyDnVARQxQtOJDXlk
-# h36UYCRsr55JnOloXtLfm1OyCizDr9mpK656Ca/XllnKYBoF6WZ26DJSJhIv56sI
-# UM+zRLdd2MQuA3WraPPLbfM6XKEW9Ea64DhkrG5kNXimoGMPLdNAk/jj3gcN1Vx5
-# pUkp5w2+oBN3vpQ97/vjK1oQH01WKKJ6cuASOrdJXtjt7UORg9l7snuGG9k+sYxd
-# 6IlPhBryoS9Z5JA7La4zWMW3Pv4y07MDPbGyr5I4ftKdgCz1TlaRITUlwzluZH9T
-# upwPrRkjhMv0ugOGjfdf8NBSv4yUh7zAIXQlXxgotswnKDglmDlKNs98sZKuHCOn
-# qWbsYR9q4ShJnV+I4iVd0yFLPlLEtVc/JAPw0XpbL9Uj43BdD1FGd7P4AOG8rAKC
-# X9vAFbO9G9RVS+c5oQ/pI0m8GLhEfEXkwcNyeuBy5yTfv0aZxe/CHFfbg43sTUkw
-# p6uO3+xbn6/83bBm4sGXgXvt1u1L50kppxMopqd9Z4DmimJ4X7IvhNdXnFy/dygo
-# 8e1twyiPLI9AN0/B4YVEicQJTMXUpUMvdJX3bvh4IFgsE11glZo+TzOE2rCIF96e
-# TvSWsLxGoGyY0uDWiIwLAgMBAAGjggHtMIIB6TAQBgkrBgEEAYI3FQEEAwIBADAd
-# BgNVHQ4EFgQUSG5k5VAF04KqFzc3IrVtqMp1ApUwGQYJKwYBBAGCNxQCBAweCgBT
-# AHUAYgBDAEEwCwYDVR0PBAQDAgGGMA8GA1UdEwEB/wQFMAMBAf8wHwYDVR0jBBgw
-# FoAUci06AjGQQ7kUBU7h6qfHMdEjiTQwWgYDVR0fBFMwUTBPoE2gS4ZJaHR0cDov
-# L2NybC5taWNyb3NvZnQuY29tL3BraS9jcmwvcHJvZHVjdHMvTWljUm9vQ2VyQXV0
-# MjAxMV8yMDExXzAzXzIyLmNybDBeBggrBgEFBQcBAQRSMFAwTgYIKwYBBQUHMAKG
-# Qmh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2kvY2VydHMvTWljUm9vQ2VyQXV0
-# MjAxMV8yMDExXzAzXzIyLmNydDCBnwYDVR0gBIGXMIGUMIGRBgkrBgEEAYI3LgMw
-# gYMwPwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMv
-# ZG9jcy9wcmltYXJ5Y3BzLmh0bTBABggrBgEFBQcCAjA0HjIgHQBMAGUAZwBhAGwA
-# XwBwAG8AbABpAGMAeQBfAHMAdABhAHQAZQBtAGUAbgB0AC4gHTANBgkqhkiG9w0B
-# AQsFAAOCAgEAZ/KGpZjgVHkaLtPYdGcimwuWEeFjkplCln3SeQyQwWVfLiw++MNy
-# 0W2D/r4/6ArKO79HqaPzadtjvyI1pZddZYSQfYtGUFXYDJJ80hpLHPM8QotS0LD9
-# a+M+By4pm+Y9G6XUtR13lDni6WTJRD14eiPzE32mkHSDjfTLJgJGKsKKELukqQUM
-# m+1o+mgulaAqPyprWEljHwlpblqYluSD9MCP80Yr3vw70L01724lruWvJ+3Q3fMO
-# r5kol5hNDj0L8giJ1h/DMhji8MUtzluetEk5CsYKwsatruWy2dsViFFFWDgycSca
-# f7H0J/jeLDogaZiyWYlobm+nt3TDQAUGpgEqKD6CPxNNZgvAs0314Y9/HG8VfUWn
-# duVAKmWjw11SYobDHWM2l4bf2vP48hahmifhzaWX0O5dY0HjWwechz4GdwbRBrF1
-# HxS+YWG18NzGGwS+30HHDiju3mUv7Jf2oVyW2ADWoUa9WfOXpQlLSBCZgB/QACnF
-# sZulP0V3HjXG0qKin3p6IvpIlR+r+0cjgPWe+L9rt0uX4ut1eBrs6jeZeRhL/9az
-# I2h15q/6/IvrC4DqaTuv/DDtBEyO3991bWORPdGdVk5Pv4BXIqF4ETIheu9BCrE/
-# +6jMpF3BoYibV3FWTkhFwELJm3ZbCoBIa/15n8G9bW1qyVJzEw16UM0xggScMIIE
-# mAIBATCBlTB+MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4G
-# A1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSgw
-# JgYDVQQDEx9NaWNyb3NvZnQgQ29kZSBTaWduaW5nIFBDQSAyMDExAhMzAAABA14l
-# HJkfox64AAAAAAEDMAkGBSsOAwIaBQCggbAwGQYJKoZIhvcNAQkDMQwGCisGAQQB
-# gjcCAQQwHAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkE
-# MRYEFBa9ziRJCHcuhkpDM2GTNFsXqcJ5MFAGCisGAQQBgjcCAQwxQjBAoBaAFABQ
-# AG8AdwBlAHIAUwBoAGUAbABsoSaAJGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9Q
-# b3dlclNoZWxsIDANBgkqhkiG9w0BAQEFAASCAQCVgHQgt4fPrLqcN56FXaOTp2X4
-# KwQPD3wrXXacx7OyRNpcVEkth5XGw8NVNtdnHpRRLVi4+QVLxEx0lPDGcbfMnuHn
-# w7Y+q3WwwksRtmjoA4V5vZN6P5vEuOj17wZtsENGU2Kg4FUuScn+ty1FeeOVsfv5
-# Wsktny4ppZE8GLvYh01zyNWNGyLvAztX7oZ/edj91CR64IRSyeW3v4NchKynbImx
-# vNywMuuz8+XrLVgq5eFv1Wmt5sWwuQUaxmTidLNDZUHgFt58K0uCJPabGZlU9kQZ
-# 66QkBMdY0jYZfNjiHTdPdaEkruDNgkzrrg2m7Lg4w9qaREgAWE0zb7juIvYQoYIC
-# KDCCAiQGCSqGSIb3DQEJBjGCAhUwggIRAgEBMIGOMHcxCzAJBgNVBAYTAlVTMRMw
-# EQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVN
-# aWNyb3NvZnQgQ29ycG9yYXRpb24xITAfBgNVBAMTGE1pY3Jvc29mdCBUaW1lLVN0
-# YW1wIFBDQQITMwAAAMvZUgZTvz4qWQAAAAAAyzAJBgUrDgMCGgUAoF0wGAYJKoZI
-# hvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMTgwODE2MTYyNTQy
-# WjAjBgkqhkiG9w0BCQQxFgQUrm6sNFP+1cfvX1pPyOxvA+RFt5owDQYJKoZIhvcN
-# AQEFBQAEggEATLdN8ZbXH1F+huoHo5YujK1cV5ZNKZhUMt8zfizvDv8mbvZv9j+1
-# UrKkfSvPjUyaQWm+lMuuFox4FcGauAqbER09+ZxtmK3c/UaAFuwUrVH92Etxrgbn
-# Vv3uNAOa47fcfMSGM1Fg1PVai1bCScvfbNCVwDwHekbKSolQ49EPzsRRPFxtErc7
-# 0Z99+Azeyrmkwx3yTAM1ipdrANSNhGbLM3splIUIkjCr7KxiXDttBzQOtzsBld7b
-# iIgRqRsxUIvv5OHTLBStTnFdYrrutGD3UQ8jtlBZmlUAuS1Pnc0lcDHZrBtaTT/U
-# ECsW3Psc2NRit0awDwd8OsSWfVnQO4/cwA==
+# KDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNpZ25pbmcgUENBIDIwMTECEzMAAADE
+# 6Yn4eoFQ6f8AAAAAAMQwCQYFKw4DAhoFAKCBsDAZBgkqhkiG9w0BCQMxDAYKKwYB
+# BAGCNwIBBDAcBgorBgEEAYI3AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0B
+# CQQxFgQUVywTZ/i/Y4MP1F4dTB/gD6MnLyAwUAYKKwYBBAGCNwIBDDFCMECgFoAU
+# AFAAbwB3AGUAcgBTAGgAZQBsAGyhJoAkaHR0cDovL3d3dy5taWNyb3NvZnQuY29t
+# L1Bvd2VyU2hlbGwgMA0GCSqGSIb3DQEBAQUABIIBAAzmKMZWVvMNOiatxKT6Zeue
+# 0ebq5KSdBRV8IQ80NuLKjMhHniWPeF0DxWM4spnH4x+Ywlmsnqdbmv++jgtJqliV
+# hzI333FYQory5OJTmAMb6Ao3VceoadwufN37DrdO/o/QxjCeJ+2UHxzjHWKb7yqW
+# Ko8W/R6FaTUyzUaPiocBMFbmZYKQ9qyF+uO/BSTWdjw87w/+0fNQga3KExc4T1j0
+# YCbqsjQNs/AsqBC+zFraFgCRGLsF8i9v6qc4FQ9ZkpNAgduX+dJkFSuyqbBShyDU
+# HtG8xc6JqvRogkl0ZNuzROsgQUv7EJL3/INa7ckqDy+RRbGJ92VNSi/sXP2yXxqh
+# ggIoMIICJAYJKoZIhvcNAQkGMYICFTCCAhECAQEwgY4wdzELMAkGA1UEBhMCVVMx
+# EzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoT
+# FU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEhMB8GA1UEAxMYTWljcm9zb2Z0IFRpbWUt
+# U3RhbXAgUENBAhMzAAAAy9lSBlO/PipZAAAAAADLMAkGBSsOAwIaBQCgXTAYBgkq
+# hkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xODA2MTExOTMx
+# NTVaMCMGCSqGSIb3DQEJBDEWBBT4K6ytCS1B/1c0jNNOb7difCKHtzANBgkqhkiG
+# 9w0BAQUFAASCAQAfAk5DUPZOduUpOduiIx9bkcNUzIKGeTZVFAOoln54M5tw9wHB
+# qIib+FDDYmqCxTF9EOj31z5Gd6PR4fQiY2WI2Cq8eJgy0az9Un1pCrbg5QoAhKzP
+# /pD716TsRMXI6kf3IR07DwQHOCvHPS4oW0TTCF9duQxYxSKp8yF+C0TgDz+ilG7Z
+# YPZ3mXaq5K0NT28Jc1jYTPKc0h6kRGLJA6Ej1RMoFj1wjcyw9zB3b0gEMS3ZkhS9
+# GZZlhnO4G5l6TMNBmOlMxpjdRuFzj0BH9izZLyQ+Zleal5D2FY3vzUIhLL1WZX3N
+# CoRMr5veUkk5AzFB/YYyDr72iALJzPdcygX0
 # SIG # End signature block

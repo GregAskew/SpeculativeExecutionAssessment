@@ -27,7 +27,17 @@ namespace SpeculativeExecutionAssessment {
         KVAShadowPcidFlag = 0x00000004,
         KVAShadowInvpcidFlag = 0x00000008,
         KVAShadowRequiredFlag = 0x00000010,
-        KVAShadowRequiredAvailableFlag = 0x00000020
+        KVAShadowRequiredAvailableFlag = 0x00000020,
+        UnknownXX40 = 0x00000040,
+        UnknownXX80 = 0x00000080,
+        UnknownXX100 = 0x00000100,
+        UnknownXX200 = 0x00000200,
+        UnknownXX400 = 0x00000400,
+        UnknownXX800 = 0x00000800,
+        L1TFFlushSupported = 0x00001000,
+        L1TFMitigationPresent = 0x00002000,
+        UnknownXX4000 = 0x00004000,
+        UnknownXX8000 = 0x00008000
     }
 
     internal enum SYSTEM_INFORMATION_CLASS : uint {
