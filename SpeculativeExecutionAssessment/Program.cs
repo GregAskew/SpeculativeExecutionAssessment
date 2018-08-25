@@ -1,6 +1,7 @@
 ﻿namespace SpeculativeExecutionAssessment {
 
     #region Usings
+    using Microsoft.Win32;
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
@@ -79,16 +80,16 @@
                         actions.Add("Install BIOS/firmware update provided by your device OEM that enables hardware support for the branch target injection mitigation.");
                     }
 
-                    if (!speculativeExecutionAssessment.BTIWindowsSupportPresent 
+                    if (!speculativeExecutionAssessment.BTIWindowsSupportPresent
                         || !speculativeExecutionAssessment.KVAShadowWindowsSupportPresent
                         || !speculativeExecutionAssessment.SSBDAvailable
                         || !speculativeExecutionAssessment.L1TFMitigationPresent) {
                         actions.Add("Install the latest available updates for Windows with support for speculation control mitigations.");
                     }
 
-                    if ((speculativeExecutionAssessment.BTIHardwarePresent 
+                    if ((speculativeExecutionAssessment.BTIHardwarePresent
                         && !speculativeExecutionAssessment.BTIWindowsSupportEnabled)
-                        || (speculativeExecutionAssessment.KVAShadowRequired 
+                        || (speculativeExecutionAssessment.KVAShadowRequired
                         && !speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled)
                         || (speculativeExecutionAssessment.L1TFRequired
                         && !speculativeExecutionAssessment.L1TFMitigationPresent)) {
@@ -140,8 +141,34 @@
                     var xmlSerializer = new XmlSerializer(typeof(SpeculativeExecutionAssessment));
                     xmlSerializer.Serialize(streamWriter, speculativeExecutionAssessment);
                 }
+
+                var xmlString = new StringBuilder();
+                using (var stringWriter = new StringWriter(xmlString)) {
+                    var xmlSerializer = new XmlSerializer(typeof(SpeculativeExecutionAssessment));
+                    xmlSerializer.Serialize(stringWriter, speculativeExecutionAssessment);
+                    using (var registryKey = Registry.LocalMachine.OpenSubKey(
+                        @"Software\Microsoft\Windows\CurrentVersion\", writable: true)) {
+                        if (registryKey != null) {
+                            var speculationControlRegistryKey = registryKey.OpenSubKey("SpeculationControl", writable: true);
+                            if (speculationControlRegistryKey == null) {
+                                speculationControlRegistryKey = registryKey.CreateSubKey("SpeculationControl", writable: true);
+                            }
+                            speculationControlRegistryKey.SetValue("SpeculativeExecutionAssessment", xmlString.ToString(), RegistryValueKind.String);
+                            speculationControlRegistryKey.Dispose();
+                        }
+                    }
+                }
+
                 Console.WriteLine("Done.");
             }
+        }
+
+        /// <summary>
+        /// Unhandled Exception Logger
+        /// </summary>
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e) {
+            Exception exception = e.ExceptionObject as Exception;
+            EventLog.WriteEntry(source: "Application", message: $"Unhandled Exception: {exception.VerboseExceptionString()}", type: EventLogEntryType.Error);
         }
 
         private static void GetBranchTargetInjectionInformation(SpeculativeExecutionAssessment speculativeExecutionAssessment) {
@@ -194,22 +221,22 @@
                     #endregion
 
                     Console.Write("Hardware support for branch target injection mitigation is present: ");
-                    Console.ForegroundColor = speculativeExecutionAssessment.BTIHardwarePresent 
-                        ? ConsoleColor.Green 
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIHardwarePresent
+                        ? ConsoleColor.Green
                         : ConsoleColor.Red;
                     Console.WriteLine(speculativeExecutionAssessment.BTIHardwarePresent.ToString().ToUpperInvariant());
                     Console.ResetColor();
 
                     Console.Write("Windows OS support for branch target injection mitigation is present: ");
-                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportPresent 
-                        ? ConsoleColor.Green 
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportPresent
+                        ? ConsoleColor.Green
                         : ConsoleColor.Red;
                     Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportPresent.ToString().ToUpperInvariant());
                     Console.ResetColor();
 
                     Console.Write("Windows OS support for branch target injection mitigation is enabled: ");
-                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportEnabled 
-                        ? ConsoleColor.Green 
+                    Console.ForegroundColor = speculativeExecutionAssessment.BTIWindowsSupportEnabled
+                        ? ConsoleColor.Green
                         : ConsoleColor.Red;
                     Console.WriteLine(speculativeExecutionAssessment.BTIWindowsSupportEnabled.ToString().ToUpperInvariant());
                     Console.ResetColor();
@@ -217,15 +244,15 @@
                     #region If Windows support for branch target injection mitigation is present but not enabled, log the reason (absence of settings or lack of hardware support)
                     if (speculativeExecutionAssessment.BTIWindowsSupportPresent && !speculativeExecutionAssessment.BTIWindowsSupportEnabled) {
                         Console.Write($"Windows OS support for branch target injection mitigation is disabled by system policy: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledBySystemPolicy 
-                            ? ConsoleColor.Red 
+                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledBySystemPolicy
+                            ? ConsoleColor.Red
                             : ConsoleColor.Green;
                         Console.WriteLine(speculativeExecutionAssessment.BTIDisabledBySystemPolicy.ToString().ToUpperInvariant());
                         Console.ResetColor();
 
                         Console.Write($"Windows OS support for branch target injection mitigation is disabled by absence of hardware support: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport 
-                            ? ConsoleColor.Red : 
+                        Console.ForegroundColor = speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport
+                            ? ConsoleColor.Red :
                             ConsoleColor.Green;
                         Console.WriteLine(speculativeExecutionAssessment.BTIDisabledByNoHardwareSupport.ToString().ToUpperInvariant());
                         Console.ResetColor();
@@ -237,8 +264,8 @@
                     Console.ResetColor();
 
                     Console.Write("Windows OS support for speculative store bypass mitigation is present: ");
-                    Console.ForegroundColor = speculativeExecutionAssessment.SSBDAvailable 
-                        ? ConsoleColor.Green 
+                    Console.ForegroundColor = speculativeExecutionAssessment.SSBDAvailable
+                        ? ConsoleColor.Green
                         : ConsoleColor.Red;
                     Console.WriteLine(speculativeExecutionAssessment.SSBDAvailable.ToString().ToUpperInvariant());
                     Console.ResetColor();
@@ -247,7 +274,7 @@
                     var ssbdRequired = speculativeExecutionAssessment.SSBDRequired.HasValue
                         ? speculativeExecutionAssessment.SSBDRequired.Value.ToString().ToUpperInvariant()
                         : "UNKNOWN";
-                    if (!speculativeExecutionAssessment.SSBDRequired.HasValue) { 
+                    if (!speculativeExecutionAssessment.SSBDRequired.HasValue) {
                         Console.ForegroundColor = ConsoleColor.Red;
                     }
                     Console.WriteLine(ssbdRequired);
@@ -255,15 +282,15 @@
 
                     if (speculativeExecutionAssessment.SSBDRequired.HasValue && speculativeExecutionAssessment.SSBDRequired.Value) {
                         Console.Write("Hardware support for speculative store bypass mitigation is present: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDHardwarePresent 
-                            ? ConsoleColor.Green 
+                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDHardwarePresent
+                            ? ConsoleColor.Green
                             : ConsoleColor.Red;
                         Console.WriteLine(speculativeExecutionAssessment.SSBDHardwarePresent.ToString().ToUpperInvariant());
                         Console.ResetColor();
 
                         Console.Write("Windows OS support for speculative store bypass mitigation is enabled system-wide: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDSystemWide 
-                            ? ConsoleColor.Green 
+                        Console.ForegroundColor = speculativeExecutionAssessment.SSBDSystemWide
+                            ? ConsoleColor.Green
                             : ConsoleColor.Red;
                         Console.WriteLine(speculativeExecutionAssessment.SSBDSystemWide.ToString().ToUpperInvariant());
                         Console.ResetColor();
@@ -326,23 +353,23 @@
 
                     if (speculativeExecutionAssessment.KVAShadowRequired) {
                         Console.Write("Windows OS support for kernel VA shadow is present: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportPresent 
-                            ? ConsoleColor.Green 
+                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportPresent
+                            ? ConsoleColor.Green
                             : ConsoleColor.Red;
                         Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportPresent.ToString().ToUpperInvariant());
                         Console.ResetColor();
 
                         Console.Write("Windows OS support for kernel VA shadow is enabled: ");
-                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled 
-                            ? ConsoleColor.Green 
+                        Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled
+                            ? ConsoleColor.Green
                             : ConsoleColor.Red;
                         Console.WriteLine(speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled.ToString().ToUpperInvariant());
                         Console.ResetColor();
 
                         if (speculativeExecutionAssessment.KVAShadowWindowsSupportEnabled) {
                             Console.Write("Windows OS support for PCID performance optimization is enabled [not required for security]: ");
-                            Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowPcidEnabled 
-                                ? ConsoleColor.Green 
+                            Console.ForegroundColor = speculativeExecutionAssessment.KVAShadowPcidEnabled
+                                ? ConsoleColor.Green
                                 : ConsoleColor.White;
                             Console.WriteLine(speculativeExecutionAssessment.KVAShadowPcidEnabled.ToString().ToUpperInvariant());
                             Console.ResetColor();
@@ -411,5 +438,6 @@
 
             return returnErrorMessage;
         }
+       
     }
 }
