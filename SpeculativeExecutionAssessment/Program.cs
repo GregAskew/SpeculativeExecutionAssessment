@@ -36,7 +36,7 @@
     /// https://blogs.technet.microsoft.com/ralphkyttle/2018/01/05/verifying-spectre-meltdown-protections-remotely/
     /// https://support.microsoft.com/en-us/help/4072698/windows-server-guidance-to-protect-against-the-speculative-execution
     /// https://support.microsoft.com/en-gb/help/4073119/protect-against-speculative-execution-side-channel-vulnerabilities-in
-	/// https://blogs.technet.microsoft.com/srd/2018/03/23/kva-shadow-mitigating-meltdown-on-windows/
+    /// https://blogs.technet.microsoft.com/srd/2018/03/23/kva-shadow-mitigating-meltdown-on-windows/
     /// https://blogs.technet.microsoft.com/srd/2018/05/21/analysis-and-mitigation-of-speculative-store-bypass-cve-2018-3639/
     /// ADV180012 | Microsoft Guidance for Speculative Store Bypass
     /// https://portal.msrc.microsoft.com/en-us/security-guidance/advisory/adv180012
