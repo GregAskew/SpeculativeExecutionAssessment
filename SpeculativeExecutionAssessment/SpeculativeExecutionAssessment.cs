@@ -346,6 +346,10 @@
                 this.BTIDisabledBySystemPolicy = this.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledSystemPolicy);
                 this.BTIDisabledByNoHardwareSupport = this.BTIFlags.HasFlag(BTIFlags.SCFBpbDisabledNoHardwareSupport);
             }
+            else {
+                this.BTIDisabledBySystemPolicy = false;
+                this.BTIDisabledByNoHardwareSupport = false;
+            }
 
             if (this.BTIFlags.HasFlag(BTIFlags.SCFSSBDAvailable)) {
                 this.SSBDAvailable = true;
