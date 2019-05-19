@@ -6,11 +6,24 @@
     using System.Diagnostics;
     using System.Linq;
     using System.Text;
-    using System.Threading.Tasks; 
+    using System.Threading.Tasks;
     #endregion
 
     internal static class InternalExtensions {
 
+        #region DateTime Extensions
+        /// <summary>
+        /// Returns DateTime string formatted in yyyy-MM-dd HH:mm:ss
+        /// </summary>
+        /// <param name="datetime">The DateTime</param>
+        /// <returns>The formatted string</returns>
+        [DebuggerStepThroughAttribute]
+        public static string YMDHMSFriendly(this DateTime datetime) {
+            return datetime.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+        #endregion
+
+        #region Exception Extensions
         /// <summary>
         /// Stack trace, target site, and error message of outer and inner exception, formatted with newlines
         /// </summary>
@@ -33,5 +46,6 @@
 
             return exceptionString.ToString();
         }
+        #endregion
     }
 }

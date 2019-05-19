@@ -1,6 +1,6 @@
-﻿using System;
+﻿namespace SpeculativeExecutionAssessment {
 
-namespace SpeculativeExecutionAssessment {
+    using System;
 
     [Flags]
     public enum BTIFlags : uint {
@@ -16,7 +16,20 @@ namespace SpeculativeExecutionAssessment {
         SCFSSBDAvailable = 0x00000100,
         SCFSSBDSupported = 0x00000200,
         SCFSSBDSystemWide = 0x00000400,
-        SCFSSBDRequired = 0x00001000
+        SCFSSBDRequired = 0x00001000,
+        SCFSpecCtrlRetpolineEnabled = 0x00004000,
+        SCFSpecCtrlImportOptimizationEnabled = 0x00008000,
+        SCFEnhancedIbrs = 0x00010000,
+        SCFHVL1TFStatusAvailable = 0x00020000,
+        SCFHVL1TFProcessorNotAffected = 0x00040000,
+        SCFHVL1TFMigitationEnabled = 0x00080000,
+        SCFHVL1TFMigitationNotEnabledHardware = 0x00100000,
+        SCFHVL1TFMigitationNotEnabledLoadOption = 0x00200000,
+        SCFHVL1TFMigitationNotEnabledCoreScheduler = 0x00400000,
+        SCFEnhancedIBRSReported = 0x00800000,
+        SCFMDSHardwareProtected = 0x01000000,
+        SCFMBClearEnabled = 0x02000000,
+        SCFMBClearReported = 0x04000000
     }
 
     [Flags]
@@ -24,8 +37,8 @@ namespace SpeculativeExecutionAssessment {
         Undefined = 0x00000000,
         KVAShadowEnabledFlag = 0x00000001,
         KVAShadowUserGlobalFlag = 0x00000002,
-        KVAShadowPcidFlag = 0x00000004,
-        KVAShadowInvpcidFlag = 0x00000008,
+        KVAShadowPCIDFlag = 0x00000004,
+        KVAShadowInvPCIDFlag = 0x00000008,
         KVAShadowRequiredFlag = 0x00000010,
         KVAShadowRequiredAvailableFlag = 0x00000020,
         UnknownXX40 = 0x00000040,
@@ -38,6 +51,18 @@ namespace SpeculativeExecutionAssessment {
         L1TFMitigationPresent = 0x00002000,
         UnknownXX4000 = 0x00004000,
         UnknownXX8000 = 0x00008000
+    }
+
+    public enum ProcessorArchitecture : ushort {
+        x86 = 0,
+        MIPS = 1,
+        Alpha = 2,
+        PowerPC = 3,
+        ARM = 5,
+        IA64 = 6,
+        x64 = 9,
+        ARM64 = 12,
+        Undefined = 255
     }
 
     internal enum SYSTEM_INFORMATION_CLASS : uint {
