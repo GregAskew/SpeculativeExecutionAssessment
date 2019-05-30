@@ -268,7 +268,7 @@
                     if (speculativeExecutionAssessment.MDSMBClearReported) {
                         Console.Write("Hardware is vulnerable to MDS: ");
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.WriteLine(speculativeExecutionAssessment.MDSHardwareProtected.ToString().ToUpperInvariant());
+                        Console.WriteLine((!speculativeExecutionAssessment.MDSHardwareProtected).ToString().ToUpperInvariant());
                         Console.ResetColor();
 
                         if (!speculativeExecutionAssessment.MDSHardwareProtected) {
