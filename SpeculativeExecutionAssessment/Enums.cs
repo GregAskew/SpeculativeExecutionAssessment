@@ -16,7 +16,9 @@
         SCFSSBDAvailable = 0x00000100,
         SCFSSBDSupported = 0x00000200,
         SCFSSBDSystemWide = 0x00000400,
+        UnknownXX800 = 0x00000800,
         SCFSSBDRequired = 0x00001000,
+        UnknownXX2000 = 0x000002000,
         SCFSpecCtrlRetpolineEnabled = 0x00004000,
         SCFSpecCtrlImportOptimizationEnabled = 0x00008000,
         SCFEnhancedIbrs = 0x00010000,
@@ -29,7 +31,12 @@
         SCFEnhancedIBRSReported = 0x00800000,
         SCFMDSHardwareProtected = 0x01000000,
         SCFMBClearEnabled = 0x02000000,
-        SCFMBClearReported = 0x04000000
+        SCFMBClearReported = 0x04000000,
+        UnknownXX8000000 = 0x08000000,
+        UnknownXX01000000 = 0x10000000,
+        UnknownXX02000000 = 0x20000000,
+        UnknownXX04000000 = 0x40000000,
+        UnknownXX08000000 = 0x80000000
     }
 
     [Flags]
